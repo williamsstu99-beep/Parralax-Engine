@@ -13,7 +13,7 @@ Students and teachers ask for a concept. The engine builds an accurate, interact
 ## Status
 
 - [x] Circuit Truth solver (`src/engine/truth/circuit`) with 15 passing tests
-- [ ] Interactive circuit workspace
+- [x] Interactive circuit workspace (`/lab/circuits`): drag-and-drop parts, wiring, live current flow, diagnostics, LED challenge, capacitor transients
 - [ ] Lesson Spec + AI generation
 - [ ] AI tutor (text, then voice)
 - [ ] Physics and biology engines
