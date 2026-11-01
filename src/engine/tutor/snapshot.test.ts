@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { EXAMPLE_LESSON } from "../spec/fixture";
+import { EXAMPLE_LESSON, MOTION_EXAMPLE } from "../spec/fixture";
+import { motionSetup } from "../spec/motion";
+import type { MotionChallenge } from "../lens/motion/model";
 import { sceneBoard } from "../spec/validate";
-import { boardSnapshot } from "./snapshot";
+import { boardSnapshot, motionSnapshot } from "./snapshot";
 import { TUTOR_SYSTEM, lessonContext } from "./prompt";
 
 const scene0 = EXAMPLE_LESSON.scenes[0];
@@ -33,6 +35,30 @@ describe("tutor board snapshot", () => {
 
   it("handles an empty board", () => {
     expect(boardSnapshot({ parts: [], wires: [] }).text).toBe("The board is empty.");
+  });
+});
+
+describe("tutor motion snapshot", () => {
+  it("describes a projectile and the solver's result", () => {
+    const m = MOTION_EXAMPLE.scenes[0].motion!;
+    const { text } = motionSnapshot(motionSetup(m), undefined, m.editable);
+    expect(text).toMatch(/Tennis ball \(0\.058 kg\), launch speed 15 m\/s, angle 20°/);
+    // R = v² sin 2θ / g = 225 × sin 40° / 9.81 ≈ 14.7 m
+    expect(text).toMatch(/range 14\.7 m/);
+    expect(text).toMatch(/The student can change: angle\./);
+  });
+
+  it("reports what a challenge attempt would do without the student seeing it", () => {
+    const m = MOTION_EXAMPLE.scenes[1].motion!;
+    const snap = motionSnapshot(motionSetup(m), m.challenge as MotionChallenge, m.editable);
+    expect(snap.challengeDone).toBe(false);
+    expect(snap.text).toMatch(/would not succeed yet\. Engine feedback: It landed .* short/);
+  });
+
+  it("gives ramp forces from the solver", () => {
+    const snap = motionSnapshot({ kind: "ramp", angle: 30, length: 8, mass: 2, friction: 0.2, force: 0, start: 8, startSpeed: 0, planet: "earth" });
+    expect(snap.text).toMatch(/weight 19\.6 N \(9\.8 N of it acts down the slope\), normal reaction 17 N, friction 3\.4 N up the slope/);
+    expect(snap.text).toMatch(/reaches the bottom of the slope/);
   });
 });
 

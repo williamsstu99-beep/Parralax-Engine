@@ -1,14 +1,17 @@
 /**
- * What the tutor knows about the student's circuit right now.
+ * What the tutor knows about the student's simulation right now.
  *
  * The tutor never works numbers out itself: the server solves the student's
- * current board with the Truth solver and hands the tutor these readings.
+ * current circuit or motion setup with the Truth solvers and hands the tutor these readings.
  * Everything here is computed, so the tutor can quote it safely.
  */
 import { CATALOG, buildNetlist, type Board, type Part } from "../lens/circuit/board";
 import { solveDC } from "../truth/circuit/solver";
 import type { ChallengeDef } from "../spec/lesson";
 import { partLabel, toChallenge } from "../spec/validate";
+import { BODIES, evalChallenge, type MotionChallenge } from "../lens/motion/model";
+import { rampForces, solveMotion } from "../truth/motion/solver";
+import { GRAVITY, type MotionSetup, type Planet } from "../truth/motion/types";
 
 const amps = (a: number) => {
   const x = Math.abs(a);
@@ -80,6 +83,44 @@ export function boardSnapshot(board: Board, challenge?: ChallengeDef): Snapshot 
     const res = toChallenge(challenge).check(board, sol);
     challengeDone = res.done;
     lines.push(`Challenge "${challenge.title}" (${challenge.goal}): ${res.done ? "SOLVED" : `not solved yet. Engine feedback: ${res.hint}`}`);
+  }
+  return { text: lines.join("\n"), challengeDone };
+}
+
+/* ---------------- motion ---------------- */
+
+const PLANET_NAMES: Record<Planet, string> = { earth: "Earth", moon: "the Moon", mars: "Mars", jupiter: "Jupiter" };
+const num = (v: number, unit: string, dp = 2) => `${+v.toFixed(dp)} ${unit}`;
+
+/** Solve the student's current motion settings and describe them for the tutor. */
+export function motionSnapshot(setup: MotionSetup, challenge?: MotionChallenge, editable?: string[]): Snapshot {
+  const r = solveMotion(setup);
+  const sm = r.summary;
+  const g = GRAVITY[setup.planet];
+  const lines: string[] = [];
+  if (setup.kind === "projectile") {
+    const body = (Object.values(BODIES) as { label: string; mass: number; dragArea: number }[]).find(b => b.mass === setup.mass && b.dragArea === setup.dragArea);
+    lines.push(`Motion lab, projectile. Settings: ${body ? `${body.label} (${setup.mass} kg)` : `object of ${setup.mass} kg`}, launch speed ${setup.speed} m/s, angle ${setup.angle}°, launch height ${setup.height} m, on ${PLANET_NAMES[setup.planet]} (g = ${g} m/s²), air resistance ${setup.air ? "on" : "off"}.`);
+    if (setup.target) lines.push(`Target zone: centred ${setup.target.x} m from the launch point, ${setup.target.width} m wide.`);
+    lines.push(`Solver result for these settings: range ${num(sm.distance, "m", 1)}, highest point ${num(sm.maxHeight, "m", 1)}, time in the air ${num(r.duration, "s")}, landing speed ${num(sm.finalSpeed, "m/s", 1)}${sm.terminalSpeed ? `, terminal velocity ${num(sm.terminalSpeed, "m/s", 1)}` : ""}.`);
+    const first = r.samples[0], last = r.samples[r.samples.length - 1];
+    lines.push(`Energy: at launch ${num(first.ke, "J")} kinetic + ${num(first.gpe, "J")} gravitational; at landing ${num(last.ke, "J")} kinetic${last.lost > 0 ? `, ${num(last.lost, "J")} turned to heat by air resistance` : ""}.`);
+  } else {
+    const f = rampForces(setup, setup.startSpeed);
+    const endings = { top: "reaches the top of the slope", bottom: "reaches the bottom of the slope", stopped: "comes to a stop on the slope", held: "is held still by friction and never moves" };
+    lines.push(`Motion lab, ramp. Settings: ${setup.mass} kg block on a ${setup.angle}° slope ${setup.length} m long, friction coefficient ${setup.friction}, applied force ${setup.force} N along the slope (positive = up), starting at the ${setup.start > 0 ? "top" : "bottom"} with velocity ${setup.startSpeed} m/s, on ${PLANET_NAMES[setup.planet]} (g = ${g} m/s²).`);
+    lines.push(`Forces at the start: weight ${num(setup.mass * g, "N", 1)} (${num(-f.weightAlong, "N", 1)} of it acts down the slope), normal reaction ${num(f.normal, "N", 1)}, friction ${num(Math.abs(f.friction), "N", 1)} ${f.friction > 0 ? "up" : f.friction < 0 ? "down" : "along"} the slope, net force ${num(f.net, "N", 1)} along the slope.`);
+    lines.push(`Solver result: acceleration ${num(sm.acceleration ?? 0, "m/s²")} (positive = up the slope); the block ${endings[sm.ending ?? "stopped"]}${sm.ending === "held" ? "" : ` after ${num(r.duration, "s")}, final speed ${num(sm.finalSpeed, "m/s")}`}.`);
+    const last = r.samples[r.samples.length - 1];
+    if (sm.ending !== "held") lines.push(`Energy at the end: ${num(last.ke, "J")} kinetic, ${num(last.gpe, "J")} gravitational, ${num(last.lost, "J")} turned to heat by friction${last.work ? `, ${num(last.work, "J")} of work done by the applied force` : ""}.`);
+  }
+  if (editable?.length) lines.push(`The student can change: ${editable.join(", ")}.`);
+  lines.push(r.diagnostics.length ? `Engine notes: ${r.diagnostics.map(d => d.message).join(" ")}` : "Engine notes: none.");
+  let challengeDone: boolean | null = null;
+  if (challenge) {
+    const res = evalChallenge(challenge, r);
+    challengeDone = res.done;
+    lines.push(`Challenge "${challenge.title}" (${challenge.goal}): if they ran these settings now it would ${res.done ? "SUCCEED" : `not succeed yet. Engine feedback: ${res.hint}`} (the student only sees the result after they run it, so don't give the outcome away).`);
   }
   return { text: lines.join("\n"), challengeDone };
 }

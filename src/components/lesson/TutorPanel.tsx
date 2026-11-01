@@ -3,8 +3,12 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Mark } from "@/components/brand/Mark";
 import type { Board } from "@/engine/lens/circuit/board";
+import type { MotionSetup } from "@/engine/truth/motion/types";
 import type { Lesson } from "@/engine/spec/lesson";
 import type { TutorEvent } from "@/engine/tutor/prompt";
+
+/** What the student has in front of them: a circuit board or motion settings. */
+export interface Sim { board?: Board; motion?: MotionSetup }
 
 interface Msg { role: "user" | "assistant"; content: string; error?: boolean }
 
@@ -17,7 +21,7 @@ function Rich({ text }: { text: string }) {
     part.startsWith("**") && part.endsWith("**") ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong> : <Fragment key={i}>{part}</Fragment>)}</>;
 }
 
-export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Lesson; sceneIdx: number; getBoard: () => Board }) {
+export default function TutorPanel({ lesson, sceneIdx, getSim }: { lesson: Lesson; sceneIdx: number; getSim: () => Sim }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
@@ -46,7 +50,7 @@ export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Les
     try {
       const res = await fetch("/api/tutor", {
         method: "POST", headers: { "content-type": "application/json" }, signal: ctrl.signal,
-        body: JSON.stringify({ lesson, sceneIndex: sceneIdx, board: getBoard(), messages: sent.map(({ role, content }) => ({ role, content })) }),
+        body: JSON.stringify({ lesson, sceneIndex: sceneIdx, ...getSim(), messages: sent.map(({ role, content }) => ({ role, content })) }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
@@ -94,7 +98,7 @@ export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Les
         <Mark size={24} />
         <div className="flex flex-col leading-tight">
           <span className="font-semibold">Tutor</span>
-          <span className="text-xs text-[var(--muted)]">Sees your circuit · numbers come from the solver</span>
+          <span className="text-xs text-[var(--muted)]">Sees your simulation · numbers come from the solver</span>
         </div>
         <button onClick={() => setOpen(false)} aria-label="Close tutor" className="ml-auto rounded-lg px-2 py-1 text-xl leading-none text-[var(--muted)] hover:bg-[var(--raise)] hover:text-[var(--fg)]">×</button>
       </header>
@@ -102,7 +106,7 @@ export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Les
       <div ref={list} aria-live="polite" className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
         {msgs.length === 0 && (
           <div className="flex flex-col gap-3">
-            <p className="text-[15px] leading-relaxed text-[var(--muted)]">Kia ora! Ask me anything about this lesson. I can see your circuit as you change it, so try something and ask me what happened.</p>
+            <p className="text-[15px] leading-relaxed text-[var(--muted)]">Kia ora! Ask me anything about this lesson. I can see your simulation as you change it, so try something and ask me what happened.</p>
             <div className="flex flex-wrap gap-2">
               {STARTERS.map(s => (
                 <button key={s} onClick={() => send(s)} className="rounded-full border border-[var(--line)] px-3 py-1.5 text-left text-sm text-[var(--muted)] hover:border-[var(--flow)] hover:text-[var(--fg)]">{s}</button>

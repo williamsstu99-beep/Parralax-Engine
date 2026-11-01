@@ -3,9 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CircuitLab from "@/components/lab/CircuitLab";
+import MotionLab from "@/components/lab/MotionLab";
 import TutorPanel from "@/components/lesson/TutorPanel";
 import { Mark, Wordmark } from "@/components/brand/Mark";
-import { EXAMPLE_LESSON } from "@/engine/spec/fixture";
+import { EXAMPLE_LESSON, MOTION_EXAMPLE } from "@/engine/spec/fixture";
+import { motionScene } from "@/engine/spec/motion";
+import type { MotionSetup } from "@/engine/truth/motion/types";
+import type { Sim } from "@/components/lesson/TutorPanel";
 import type { Lesson } from "@/engine/spec/lesson";
 import { sceneBoard, toChallenge } from "@/engine/spec/validate";
 import type { Sample } from "@/engine/lens/circuit/samples";
@@ -13,11 +17,14 @@ import type { Board } from "@/engine/lens/circuit/board";
 
 const EXAMPLES = [
   "Year 9: why do bulbs in series get dimmer?",
+  "Year 10: what angle throws a ball furthest?",
   "Year 11: why does an LED need a resistor?",
-  "Year 12: how a capacitor charges through a resistor",
+  "Year 11: friction and forces on a slope",
+  "Year 12: terminal velocity and parachutes",
   "Year 7: what makes a complete circuit?",
 ];
-const STEPS = ["Reading your request", "Planning the lesson", "Building the circuits", "Checking every circuit with the solver", "Writing explanations and questions"];
+const STEPS = ["Reading your request", "Planning the lesson", "Building the simulations", "Checking every simulation with the solver", "Writing explanations and questions"];
+const ENGINE_LABEL = { circuits: "Circuits", motion: "Motion" } as const;
 
 type Status = { kind: "idle" } | { kind: "loading"; started: number } | { kind: "error"; message: string; details?: string[] } | { kind: "ready"; lesson: Lesson; example: boolean };
 
@@ -55,7 +62,7 @@ export default function LessonStudio() {
         <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-16 sm:py-24">
           <div className="flex flex-col gap-3">
             <h1 className="text-4xl font-semibold tracking-[-0.03em] text-balance sm:text-5xl">What do you want to teach?</h1>
-            <p className="text-lg text-[var(--muted)]">Describe a concept and a year level. You&apos;ll get interactive circuits, challenges, explanations at three levels, and questions, all checked by a real circuit solver.</p>
+            <p className="text-lg text-[var(--muted)]">Describe a concept and a year level. You&apos;ll get interactive simulations (circuits, or forces and motion), challenges, explanations at three levels, and questions, all checked by real solvers.</p>
           </div>
           <form onSubmit={e => { e.preventDefault(); generate(request); }} className="flex flex-col gap-3">
             <label htmlFor="request" className="sr-only">Lesson request</label>
@@ -74,6 +81,8 @@ export default function LessonStudio() {
                 className="rounded-xl bg-[var(--flow)] px-6 py-3 font-semibold text-[var(--ink)] hover:brightness-110 disabled:opacity-50">Build the lesson</button>
               <button type="button" onClick={() => setStatus({ kind: "ready", lesson: EXAMPLE_LESSON, example: true })} disabled={status.kind === "loading"}
                 className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--fg)]">See a pre-made example lesson</button>
+              <button type="button" onClick={() => setStatus({ kind: "ready", lesson: MOTION_EXAMPLE, example: true })} disabled={status.kind === "loading"}
+                className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--fg)]">or a motion example</button>
             </div>
           </form>
           {status.kind === "loading" && <Progress started={status.started} />}
@@ -119,17 +128,19 @@ function LessonView({ lesson, example }: { lesson: Lesson; example: boolean }) {
     id: `scene-${sceneIdx}`, title: scene.heading, summary: scene.intro, board: sceneBoard(scene),
     challenge: scene.challenge ? toChallenge(scene.challenge) : undefined,
   }), [scene, sceneIdx]);
-  // The student's live board, read by the tutor when they send a message.
-  const board = useRef<Board>(sample.board);
-  const onBoardChange = useCallback((b: Board) => { board.current = b; }, []);
-  const getBoard = useCallback(() => board.current, []);
+  const motion = useMemo(() => (scene.motion ? motionScene(scene.motion, `scene-${sceneIdx}`, scene.heading, scene.intro) : null), [scene, sceneIdx]);
+  // The student's live simulation, read by the tutor when they send a message.
+  const sim = useRef<Sim>({});
+  const onBoardChange = useCallback((b: Board) => { sim.current = { board: b }; }, []);
+  const onSetupChange = useCallback((m: MotionSetup) => { sim.current = { motion: m }; }, []);
+  const getSim = useCallback(() => sim.current, []);
 
   return (
     <main className="flex flex-col gap-6 px-4 py-6 sm:px-6">
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-[var(--raise)] px-3 py-1 font-mono text-xs uppercase tracking-[0.08em] text-[var(--muted)]">Year {lesson.year_level}</span>
-          <span className="rounded-full bg-[var(--raise)] px-3 py-1 font-mono text-xs uppercase tracking-[0.08em] text-[var(--muted)]">Circuits</span>
+          <span className="rounded-full bg-[var(--raise)] px-3 py-1 font-mono text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{ENGINE_LABEL[lesson.engine]}</span>
           {example && <span className="rounded-full border border-[var(--volt)] px-3 py-1 font-mono text-xs uppercase tracking-[0.08em] text-[var(--volt)]">Pre-made example</span>}
         </div>
         <h1 className="max-w-4xl text-3xl font-semibold tracking-[-0.03em] text-balance sm:text-4xl">{lesson.title}</h1>
@@ -148,7 +159,9 @@ function LessonView({ lesson, example }: { lesson: Lesson; example: boolean }) {
 
       <section className="flex flex-col gap-4">
         <p className="max-w-3xl text-[17px] leading-relaxed">{scene.intro}</p>
-        <CircuitLab key={sample.id} initial={sample} embedded onBoardChange={onBoardChange} />
+        {lesson.engine === "motion" && motion
+          ? <MotionLab key={motion.id} initial={motion} embedded onSetupChange={onSetupChange} />
+          : <CircuitLab key={sample.id} initial={sample} embedded onBoardChange={onBoardChange} />}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -174,7 +187,7 @@ function LessonView({ lesson, example }: { lesson: Lesson; example: boolean }) {
 
       <Questions lesson={lesson} />
 
-      <TutorPanel lesson={lesson} sceneIdx={sceneIdx} getBoard={getBoard} />
+      <TutorPanel lesson={lesson} sceneIdx={sceneIdx} getSim={getSim} />
 
       <details className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5">
         <summary className="cursor-pointer text-lg font-semibold">Teacher notes</summary>

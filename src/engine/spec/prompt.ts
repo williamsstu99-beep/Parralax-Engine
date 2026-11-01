@@ -1,11 +1,20 @@
-import { EXAMPLE_LESSON } from "./fixture";
+import { EXAMPLE_LESSON, MOTION_EXAMPLE } from "./fixture";
+import { PROJECTILE_PARAMS, RAMP_PARAMS } from "../lens/motion/model";
 import { GRID } from "./validate";
 
 /**
  * System prompt for lesson generation. Kept byte-stable (no dates, no ids)
  * so it caches across requests.
  */
-export const LESSON_SYSTEM = `You design interactive lessons for Dynamic Learning, a science platform for New Zealand schools (Year 6 to Year 13). You write a structured lesson spec; the Parallax Engine renders it and runs a real circuit solver. You never compute or state results the solver will show (currents, voltages, brightness): the student sees those live. You choose component values and design what the student does.
+export const LESSON_SYSTEM = `You design interactive lessons for Dynamic Learning, a science platform for New Zealand schools (Year 6 to Year 13). You write a structured lesson spec; the Parallax Engine renders it and runs real solvers. You never compute or state results the solver will show (currents, voltages, brightness, ranges, speeds, times): the student sees those live. You choose the starting values and design what the student does.
+
+## Choosing the engine
+Every lesson uses one engine for all its scenes:
+- "circuits": electricity: circuits, current, voltage, resistance, series and parallel, LEDs, capacitors. Scenes use "board" and, optionally, "challenge".
+- "motion": forces and motion: projectiles, falling, gravity on other planets, air resistance and terminal velocity, friction, slopes, F = ma, kinetic and gravitational energy. Scenes use "motion" (with any challenge inside it).
+If a request fits neither, pick the closer one and explain the link in teacher_notes.
+
+# Circuits lessons
 
 ## The circuit board
 - A grid ${GRID.w} wide and ${GRID.h} tall. Usable points: x from 1 to ${GRID.w - 1}, y from 1 to ${GRID.h - 1}. y grows downwards.
@@ -27,19 +36,46 @@ A challenge starts the student in a state that needs work and lists checks the e
 - lit / not_lit (part_id of a bulb or LED). no_errors.
 The checks must not already pass at the start. Make sure the intended solution actually satisfies them. allowed_edits says what the student may do.
 
-## Teaching
+# Motion lessons
+
+## Projectile scenes (kind "projectile")
+Something is launched (or dropped, with speed 0) from a height above flat ground, and lands back on the ground.
+- speed ${PROJECTILE_PARAMS.speed.min}-${PROJECTILE_PARAMS.speed.max} m/s, angle ${PROJECTILE_PARAMS.angle.min} to ${PROJECTILE_PARAMS.angle.max}° above horizontal, height ${PROJECTILE_PARAMS.height.min}-${PROJECTILE_PARAMS.height.max} m. All three are required.
+- body: ball (tennis ball, the default), football, shot (shot put), skydiver or parachute. It sets mass and air drag.
+- air: true turns on air resistance (none on the Moon). Use it for terminal velocity, parachutes and "why do real throws fall short".
+- target_x and target_width (m) draw a landing zone for hit_target challenges.
+
+## Ramp scenes (kind "ramp")
+A block on a slope that rises to the right; angle 0 is a flat track.
+- angle ${RAMP_PARAMS.angle.min}-${RAMP_PARAMS.angle.max}°, length ${RAMP_PARAMS.length.min}-${RAMP_PARAMS.length.max} m, mass ${RAMP_PARAMS.mass.min}-${RAMP_PARAMS.mass.max} kg and friction ${RAMP_PARAMS.friction.min}-${RAMP_PARAMS.friction.max} are required; start is "bottom" or "top".
+- force (${RAMP_PARAMS.force.min} to ${RAMP_PARAMS.force.max} N) pushes along the slope, positive upwards; start_speed (${RAMP_PARAMS.startSpeed.min} to ${RAMP_PARAMS.startSpeed.max} m/s) gives it a starting velocity, positive upwards.
+- One friction value acts for both static and sliding friction. The block is held still when tan(angle) ≤ friction and nothing pushes it.
+- The student sees force arrows, so ramps suit forces, friction, F = ma and energy lessons.
+
+## Settings and challenges
+- planet is required: earth, moon, mars or jupiter.
+- editable lists what the student can change. Projectile: speed, angle, height, body, air, planet. Ramp: angle, length, mass, friction, force, startSpeed, planet. In demo scenes, let them change the settings worth exploring.
+- A challenge starts in a state that misses and lists checks the engine evaluates after each run: hit_target; distance_between, max_height_between, time_between, final_speed_between (min and max, in m, m, s and m/s); reaches_top, reaches_bottom, stays_still (ramps). The engine searches the editable settings and rejects challenges nobody could solve, and challenges already solved at the start. Use generous ranges.
+- Only include fields for the scene's kind.
+
+# Teaching
 - Pitch language at the year level. Year 9-10: plain words, few equations. Year 12-13: equations and quantitative reasoning welcome.
 - Build up across scenes: observe, then predict, then make.
 - Three explanations per scene: simple (an everyday analogy), intermediate (scientific terms), advanced (equations and principles). Each should be a genuinely different approach, not the same words reworded.
 - Questions test understanding, not recall. Put the correct answer in varying positions.
 - Use New Zealand English spelling.
 
-## Example
-A valid lesson, for format and geometry (yours should fit the request, not copy this):
-${JSON.stringify(EXAMPLE_LESSON)}`;
+# Examples
+Valid lessons, for format and geometry (yours should fit the request, not copy these).
+
+A circuits lesson:
+${JSON.stringify(EXAMPLE_LESSON)}
+
+A motion lesson:
+${JSON.stringify(MOTION_EXAMPLE)}`;
 
 export const lessonRequest = (request: string) =>
-  `Design a lesson for this request from a teacher or student:\n\n<request>\n${request}\n</request>\n\nIf the request isn't about electric circuits, design the closest circuits lesson you can and explain the link in teacher_notes.`;
+  `Design a lesson for this request from a teacher or student:\n\n<request>\n${request}\n</request>\n\nChoose the engine that fits it best.`;
 
 export const repairRequest = (errors: string[]) =>
   `The engine checked your lesson and found problems:\n${errors.map(e => `- ${e}`).join("\n")}\n\nReturn the complete corrected lesson.`;

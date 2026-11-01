@@ -2,7 +2,7 @@
  * The Lesson Spec: the structured format the AI writes and the engine checks.
  *
  * The AI never writes code or physics results. It writes this: which engine,
- * the starting circuit, what the student should do, and how to tell when
+ * the starting circuit or motion setup, what the student should do, and how to tell when
  * they've done it (declarative checks the engine evaluates against the
  * Truth solver). Numeric ranges and geometry are checked in validate.ts,
  * not in the schema, so the schema stays friendly to structured output.
@@ -43,17 +43,50 @@ export const ChallengeSpec = z.object({
   allowed_edits: z.array(z.enum(["change_values", "add_parts", "move_parts", "rewire", "toggle_switches"])),
 });
 
+export const MotionCheckSpec = z.object({
+  kind: z.enum(["hit_target", "distance_between", "max_height_between", "time_between", "final_speed_between", "reaches_top", "reaches_bottom", "stays_still"]),
+  min: z.number().optional().describe("For *_between checks: lower bound (m, s or m/s)"),
+  max: z.number().optional().describe("For *_between checks: upper bound"),
+});
+
+export const MotionSpec = z.object({
+  kind: z.enum(["projectile", "ramp"]),
+  planet: z.enum(["earth", "moon", "mars", "jupiter"]),
+  body: z.enum(["ball", "football", "shot", "skydiver", "parachute"]).optional().describe("projectile only: the object, which sets its mass and air drag"),
+  speed: z.number().optional().describe("projectile only: launch speed, m/s"),
+  angle: z.number().optional().describe("projectile: launch angle above horizontal, degrees. ramp: slope angle, degrees"),
+  height: z.number().optional().describe("projectile only: launch height, m"),
+  air: z.boolean().optional().describe("projectile only: whether air resistance acts"),
+  target_x: z.number().optional().describe("projectile only: centre of a landing target, m from the launch point"),
+  target_width: z.number().optional().describe("projectile only: width of the landing target, m"),
+  length: z.number().optional().describe("ramp only: slope length, m"),
+  mass: z.number().optional().describe("ramp only: block mass, kg"),
+  friction: z.number().optional().describe("ramp only: coefficient of friction"),
+  force: z.number().optional().describe("ramp only: applied force along the slope, N; positive pushes up the slope"),
+  start: z.enum(["bottom", "top"]).optional().describe("ramp only: where the block starts"),
+  start_speed: z.number().optional().describe("ramp only: starting velocity along the slope, m/s; positive is up"),
+  editable: z.array(z.enum(["speed", "angle", "height", "body", "air", "planet", "length", "mass", "friction", "force", "startSpeed"])).describe("Settings the student may change"),
+  challenge: z.object({
+    title: z.string(),
+    goal: z.string().describe("One sentence telling the student what to achieve"),
+    checks: z.array(MotionCheckSpec).describe("All must pass for the challenge to be complete"),
+    hint_if_stuck: z.string(),
+    success: z.string().describe("Short message shown when they succeed"),
+  }).optional(),
+});
+
 export const SceneSpec = z.object({
   heading: z.string(),
   intro: z.string().describe("2-3 sentences to the student before they start"),
-  board: z.object({ parts: z.array(PartSpec), wires: z.array(WireSpec) }),
-  challenge: ChallengeSpec.optional(),
+  board: z.object({ parts: z.array(PartSpec), wires: z.array(WireSpec) }).optional().describe("circuits lessons only: the circuit"),
+  challenge: ChallengeSpec.optional().describe("circuits lessons only"),
+  motion: MotionSpec.optional().describe("motion lessons only: the simulation"),
   explain: z.object({
     simple: z.string().describe("Everyday analogy, no jargon"),
     intermediate: z.string().describe("Scientific terms appropriate to the year level"),
     advanced: z.string().describe("Equations and underlying principles"),
   }),
-  try_this: z.array(z.string()).describe("2-3 short experiments to try on this board"),
+  try_this: z.array(z.string()).describe("2-3 short experiments to try in this scene"),
 });
 
 export const QuestionSpec = z.object({
@@ -64,6 +97,7 @@ export const QuestionSpec = z.object({
 });
 
 export const LessonSpec = z.object({
+  engine: z.enum(["circuits", "motion"]).describe("Which simulation engine every scene uses"),
   title: z.string(),
   year_level: z.number().describe("New Zealand year level, 6 to 13"),
   objective: z.string(),
@@ -77,3 +111,5 @@ export type Lesson = z.infer<typeof LessonSpec>;
 export type Scene = z.infer<typeof SceneSpec>;
 export type ChallengeDef = z.infer<typeof ChallengeSpec>;
 export type Check = z.infer<typeof CheckSpec>;
+export type MotionDef = z.infer<typeof MotionSpec>;
+export type Engine = Lesson["engine"];

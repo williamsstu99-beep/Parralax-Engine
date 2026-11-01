@@ -16,19 +16,19 @@ describe("lesson validation", () => {
 
   it("catches diagonal wires and explains how to fix them", () => {
     const l = clone();
-    l.scenes[0].board.wires[0].points = [{ x: 4, y: 6 }, { x: 7, y: 3 }];
+    l.scenes[0].board!.wires[0].points = [{ x: 4, y: 6 }, { x: 7, y: 3 }];
     expect(errorsOf(l)).toMatch(/diagonally.*add a corner point/);
   });
 
   it("catches a part end that isn't connected", () => {
     const l = clone();
-    l.scenes[0].board.wires.pop();
+    l.scenes[0].board!.wires.pop();
     expect(errorsOf(l)).toMatch(/isn't connected to anything/);
   });
 
   it("catches parts that run off the board", () => {
     const l = clone();
-    l.scenes[0].board.parts[2].x = 21; // horizontal bulb: right end lands at x = 22
+    l.scenes[0].board!.parts[2].x = 21; // horizontal bulb: right end lands at x = 22
     expect(errorsOf(l)).toMatch(/runs off the board/);
   });
 
@@ -47,8 +47,8 @@ describe("lesson validation", () => {
   it("rejects a short circuit", () => {
     const l = clone();
     const s = l.scenes[0];
-    s.board.parts = s.board.parts.filter(p => p.id === "bat");
-    s.board.wires = [{ id: "w", points: [{ x: 4, y: 6 }, { x: 4, y: 3 }, { x: 8, y: 3 }, { x: 8, y: 11 }, { x: 4, y: 11 }, { x: 4, y: 8 }] }];
+    s.board!.parts = s.board!.parts.filter(p => p.id === "bat");
+    s.board!.wires = [{ id: "w", points: [{ x: 4, y: 6 }, { x: 4, y: 3 }, { x: 8, y: 3 }, { x: 8, y: 11 }, { x: 4, y: 11 }, { x: 4, y: 8 }] }];
     expect(errorsOf(l)).toMatch(/short circuit/);
   });
 

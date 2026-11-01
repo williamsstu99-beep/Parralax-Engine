@@ -11,6 +11,7 @@ import type { Challenge } from "../lens/circuit/samples";
 import { solveDC } from "../truth/circuit/solver";
 import type { Solution } from "../truth/circuit/types";
 import type { ChallengeDef, Check, Lesson, Scene } from "./lesson";
+import { validateMotion } from "./motion";
 
 export const GRID = { w: 22, h: 14 };
 
@@ -19,9 +20,10 @@ export interface ValidationResult { errors: string[]; warnings: string[] }
 const inGrid = (x: number, y: number) => x >= 1 && x <= GRID.w - 1 && y >= 1 && y <= GRID.h - 1;
 
 export function sceneBoard(scene: Scene): Board {
+  const b = scene.board ?? { parts: [], wires: [] };
   return {
-    parts: scene.board.parts.map(p => ({ ...p, rot: (((p.rot % 4) + 4) % 4) as Part["rot"] })),
-    wires: scene.board.wires.map(w => ({ id: w.id, points: w.points })),
+    parts: b.parts.map(p => ({ ...p, rot: (((p.rot % 4) + 4) % 4) as Part["rot"] })),
+    wires: b.wires.map(w => ({ id: w.id, points: w.points })),
   };
 }
 
@@ -65,7 +67,7 @@ export function toChallenge(def: ChallengeDef): Challenge {
   };
 }
 
-function validateBoard(scene: Scene, where: string, out: ValidationResult) {
+function validateBoard(scene: Scene & { board: NonNullable<Scene["board"]> }, where: string, out: ValidationResult) {
   const board = sceneBoard(scene);
   const err = (m: string) => out.errors.push(`${where}: ${m}`);
   const ids = new Set<string>();
@@ -151,6 +153,17 @@ export function validateLesson(lesson: Lesson): ValidationResult {
     if (!Number.isInteger(q.answer_index)) out.errors.push(`question ${i + 1} answer_index must be a whole number`);
     if (q.answer_index < 0 || q.answer_index >= q.choices.length) out.errors.push(`question ${i + 1} has an answer_index outside its choices`);
   });
-  lesson.scenes.forEach((s, i) => validateBoard(s, `scene ${i + 1} ("${s.heading}")`, out));
+  lesson.scenes.forEach((s, i) => {
+    const where = `scene ${i + 1} ("${s.heading}")`;
+    if (lesson.engine === "circuits") {
+      if (s.motion) out.errors.push(`${where}: this is a circuits lesson, so remove "motion"`);
+      if (!s.board) out.errors.push(`${where}: circuits scenes need a board`);
+      else validateBoard({ ...s, board: s.board }, where, out);
+    } else {
+      if (s.board || s.challenge) out.errors.push(`${where}: this is a motion lesson, so remove "board" and "challenge" (put challenges inside "motion")`);
+      if (!s.motion) out.errors.push(`${where}: motion scenes need "motion"`);
+      else validateMotion(s.motion, where, out);
+    }
+  });
   return out;
 }
