@@ -14,12 +14,15 @@ export async function POST(req: Request) {
   const request = typeof body?.request === "string" ? body.request.trim() : "";
   if (!request) return Response.json({ error: "Describe what you'd like to learn or teach." }, { status: 400 });
   if (request.length > 1500) return Response.json({ error: "Keep the request under 1,500 characters." }, { status: 400 });
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return Response.json({ error: "Lesson generation isn't set up yet: the server has no ANTHROPIC_API_KEY." }, { status: 503 });
+  // PARALLAX_ANTHROPIC_API_KEY first: Claude Code cloud environments reserve ANTHROPIC_API_KEY
+  // and don't pass it to sessions. On Vercel either name works.
+  const apiKey = process.env.PARALLAX_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return Response.json({ error: "Lesson generation isn't set up yet: the server has no PARALLAX_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY." }, { status: 503 });
   }
 
   // Ignore any ANTHROPIC_BASE_URL in the environment (dev containers set their own); talk to the API directly.
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, baseURL: process.env.PARALLAX_ANTHROPIC_BASE_URL ?? "https://api.anthropic.com" });
+  const client = new Anthropic({ apiKey, baseURL: process.env.PARALLAX_ANTHROPIC_BASE_URL ?? "https://api.anthropic.com" });
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: lessonRequest(request) }];
   let lastErrors: string[] = [];
 
@@ -58,7 +61,7 @@ export async function POST(req: Request) {
     }
     return Response.json({ error: "The lesson didn't pass the engine's checks after several tries.", details: lastErrors }, { status: 422 });
   } catch (e) {
-    if (e instanceof Anthropic.AuthenticationError) return Response.json({ error: "The API key was rejected. Check ANTHROPIC_API_KEY." }, { status: 500 });
+    if (e instanceof Anthropic.AuthenticationError) return Response.json({ error: "The API key was rejected. Check PARALLAX_ANTHROPIC_API_KEY (or ANTHROPIC_API_KEY)." }, { status: 500 });
     if (e instanceof Anthropic.RateLimitError) return Response.json({ error: "Too many requests right now. Try again in a minute." }, { status: 429 });
     if (e instanceof Anthropic.APIError) return Response.json({ error: `The AI service returned an error (${e.status}).` }, { status: 502 });
     throw e;

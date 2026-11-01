@@ -26,4 +26,4 @@ npm test
 npm run dev
 ```
 
-Lesson generation needs `ANTHROPIC_API_KEY` in the environment. Without it, `/lesson` still shows a pre-made example lesson.
+Lesson generation needs an Anthropic API key in `PARALLAX_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`; Claude Code cloud environments reserve that name, so use the first one there). Without it, `/lesson` still shows a pre-made example lesson.
