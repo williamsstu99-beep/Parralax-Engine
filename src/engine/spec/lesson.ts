@@ -108,6 +108,68 @@ export const LessonSpec = z.object({
 });
 
 export type Lesson = z.infer<typeof LessonSpec>;
+
+/**
+ * Per-engine schemas for generation. One schema covering every engine is too
+ * large for structured output, so the route picks the engine first and asks
+ * for a lesson in that engine's shape. Results still parse as LessonSpec.
+ */
+const SceneCommon = SceneSpec.omit({ board: true, challenge: true, motion: true });
+export const LESSON_FORMATS = {
+  circuits: LessonSpec.extend({
+    engine: z.literal("circuits"),
+    scenes: z.array(SceneCommon.extend({ board: SceneSpec.shape.board.unwrap(), challenge: SceneSpec.shape.challenge })).describe("1 to 4 scenes, building up"),
+  }),
+  motion: LessonSpec.extend({
+    engine: z.literal("motion"),
+    scenes: z.array(SceneCommon.extend({ motion: z.lazy(() => MotionGenSpec) })).describe("1 to 4 scenes, building up"),
+  }),
+};
+
+/**
+ * The motion simulation as the AI writes it. Many optional fields make the
+ * structured-output grammar too large, so every field is required and the
+ * kind-specific settings sit in a block that is null for the other kind.
+ * spec/motion.ts converts this to MotionSpec.
+ */
+export const MotionGenSpec = z.object({
+  kind: z.enum(["projectile", "ramp"]),
+  planet: z.enum(["earth", "moon", "mars", "jupiter"]),
+  projectile: z.object({
+    body: z.enum(["ball", "football", "shot", "skydiver", "parachute"]).describe("Sets mass and air drag"),
+    speed: z.number().describe("Launch speed, m/s"),
+    angle: z.number().describe("Launch angle above horizontal, degrees"),
+    height: z.number().describe("Launch height, m"),
+    air: z.boolean().describe("Whether air resistance acts"),
+    target_x: z.number().nullable().describe("Centre of a landing target, m from the launch point, or null"),
+    target_width: z.number().nullable().describe("Width of the landing target, m, or null"),
+  }).nullable().describe("Settings for kind projectile; null for ramps"),
+  ramp: z.object({
+    angle: z.number().describe("Slope angle, degrees"),
+    length: z.number().describe("Slope length, m"),
+    mass: z.number().describe("Block mass, kg"),
+    friction: z.number().describe("Coefficient of friction"),
+    force: z.number().describe("Applied force along the slope, N; positive pushes up the slope"),
+    start: z.enum(["bottom", "top"]),
+    start_speed: z.number().describe("Starting velocity along the slope, m/s; positive is up"),
+  }).nullable().describe("Settings for kind ramp; null for projectiles"),
+  editable: MotionSpec.shape.editable,
+  challenge: z.object({
+    title: z.string(),
+    goal: z.string().describe("One sentence telling the student what to achieve"),
+    checks: z.array(z.object({
+      kind: MotionCheckSpec.shape.kind,
+      min: z.number().nullable().describe("For *_between checks: lower bound; otherwise null"),
+      max: z.number().nullable().describe("For *_between checks: upper bound; otherwise null"),
+    })).describe("All must pass for the challenge to be complete"),
+    hint_if_stuck: z.string(),
+    success: z.string().describe("Short message shown when they succeed"),
+  }).nullable().describe("A challenge, or null for a demo scene"),
+});
+export type MotionGen = z.infer<typeof MotionGenSpec>;
+
+/** Schema for the quick first step that picks the engine. */
+export const EngineChoice = z.object({ engine: z.enum(["circuits", "motion"]) });
 export type Scene = z.infer<typeof SceneSpec>;
 export type ChallengeDef = z.infer<typeof ChallengeSpec>;
 export type Check = z.infer<typeof CheckSpec>;

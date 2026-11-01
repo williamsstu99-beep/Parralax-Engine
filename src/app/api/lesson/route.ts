@@ -2,9 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { cookies } from "next/headers";
 import { ACCESS_COOKIE, hasAccess } from "@/lib/access";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { LessonSpec, type Lesson } from "@/engine/spec/lesson";
-import { LESSON_SYSTEM, lessonRequest, repairRequest } from "@/engine/spec/prompt";
+import { EngineChoice, LESSON_FORMATS, LessonSpec, type Engine, type Lesson } from "@/engine/spec/lesson";
+import { ENGINE_SYSTEM, LESSON_SYSTEM, lessonRequest, repairRequest } from "@/engine/spec/prompt";
 import { validateLesson } from "@/engine/spec/validate";
+import { lessonFromGen } from "@/engine/spec/motion";
 
 export const maxDuration = 300;
 
@@ -27,10 +28,11 @@ export async function POST(req: Request) {
 
   // Ignore any ANTHROPIC_BASE_URL in the environment (dev containers set their own); talk to the API directly.
   const client = new Anthropic({ apiKey, baseURL: process.env.PARALLAX_ANTHROPIC_BASE_URL ?? "https://api.anthropic.com" });
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: lessonRequest(request) }];
   let lastErrors: string[] = [];
 
   try {
+    const engine = await chooseEngine(client, request);
+    const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: lessonRequest(request, engine) }];
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const stream = client.beta.messages.stream({
         model: MODEL,
@@ -38,7 +40,7 @@ export async function POST(req: Request) {
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         system: [{ type: "text", text: LESSON_SYSTEM, cache_control: { type: "ephemeral" } }],
-        output_config: { effort: "medium", format: betaZodOutputFormat(LessonSpec) },
+        output_config: { effort: "medium", format: betaZodOutputFormat(LESSON_FORMATS[engine]) },
         messages,
       });
       const msg = await stream.finalMessage();
@@ -48,7 +50,7 @@ export async function POST(req: Request) {
       const text = msg.content.flatMap(b => (b.type === "text" ? [b.text] : [])).join("");
       let lesson: Lesson | null = null;
       try {
-        const parsed = LessonSpec.safeParse(JSON.parse(text));
+        const parsed = LessonSpec.safeParse(lessonFromGen(JSON.parse(text)));
         if (parsed.success) lesson = parsed.data;
         else lastErrors = parsed.error.issues.slice(0, 10).map(i => `${i.path.join(".")}: ${i.message}`);
       } catch {
@@ -67,7 +69,25 @@ export async function POST(req: Request) {
   } catch (e) {
     if (e instanceof Anthropic.AuthenticationError) return Response.json({ error: "The API key was rejected. Check PARALLAX_ANTHROPIC_API_KEY (or ANTHROPIC_API_KEY)." }, { status: 500 });
     if (e instanceof Anthropic.RateLimitError) return Response.json({ error: "Too many requests right now. Try again in a minute." }, { status: 429 });
-    if (e instanceof Anthropic.APIError) return Response.json({ error: `The AI service returned an error (${e.status}).` }, { status: 502 });
+    if (e instanceof Anthropic.APIError) {
+      console.error("lesson generation: API error", e.status, e.message);
+      return Response.json({ error: `The AI service returned an error (${e.status}).` }, { status: 502 });
+    }
     throw e;
   }
+}
+
+/** Quick first step: which engine fits the request? Defaults to circuits if anything goes wrong. */
+async function chooseEngine(client: Anthropic, request: string): Promise<Engine> {
+  const msg = await client.beta.messages.create({
+    model: MODEL,
+    max_tokens: 4000,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    system: ENGINE_SYSTEM,
+    output_config: { effort: "low", format: betaZodOutputFormat(EngineChoice) },
+    messages: [{ role: "user", content: request }],
+  });
+  const text = msg.content.flatMap(b => (b.type === "text" ? [b.text] : [])).join("");
+  try { return EngineChoice.parse(JSON.parse(text)).engine; } catch { return "circuits"; }
 }

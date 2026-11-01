@@ -12,7 +12,7 @@ import {
 } from "../lens/motion/model";
 import { solveMotion } from "../truth/motion/solver";
 import type { MotionSetup, Planet } from "../truth/motion/types";
-import type { MotionDef } from "./lesson";
+import type { Lesson, MotionDef, MotionGen } from "./lesson";
 import type { ValidationResult } from "./validate";
 
 const PROJECTILE_KEYS = ["speed", "angle", "height", "body", "air", "planet"] as const;
@@ -137,3 +137,39 @@ export function validateMotion(m: MotionDef, where: string, out: ValidationResul
     err(`no combination of the editable settings (${m.editable.join(", ")}) completes the challenge within the lab's ranges; widen the target or check ranges, or let the student change more settings`);
   }
 }
+
+/* ---------------- generation format ---------------- */
+
+type MotionCheckDef = NonNullable<MotionDef["challenge"]>["checks"][number];
+
+const dropNull = <T extends object>(o: T) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined));
+
+/** The AI's all-required motion format → the flat MotionSpec the engine uses. */
+export function fromGen(g: MotionGen): MotionDef {
+  const kindFields = g.kind === "projectile" ? (g.projectile ? dropNull(g.projectile) : {}) : (g.ramp ? dropNull(g.ramp) : {});
+  return {
+    kind: g.kind, planet: g.planet, ...kindFields, editable: g.editable,
+    challenge: g.challenge ? { ...g.challenge, checks: g.challenge.checks.map(c => dropNull(c) as MotionCheckDef) } : undefined,
+  } as MotionDef;
+}
+
+/** MotionSpec → the AI's format, for showing the worked example in the prompt. */
+export function toGen(m: MotionDef): MotionGen {
+  return {
+    kind: m.kind, planet: m.planet,
+    projectile: m.kind === "projectile" ? { body: m.body ?? "ball", speed: m.speed ?? 0, angle: m.angle ?? 0, height: m.height ?? 0, air: m.air ?? false, target_x: m.target_x ?? null, target_width: m.target_width ?? null } : null,
+    ramp: m.kind === "ramp" ? { angle: m.angle ?? 0, length: m.length ?? 8, mass: m.mass ?? 2, friction: m.friction ?? 0, force: m.force ?? 0, start: m.start ?? "bottom", start_speed: m.start_speed ?? 0 } : null,
+    editable: m.editable,
+    challenge: m.challenge ? { ...m.challenge, checks: m.challenge.checks.map(c => ({ kind: c.kind, min: c.min ?? null, max: c.max ?? null })) } : null,
+  };
+}
+
+/** A generated lesson (in its engine's generation format) → a Lesson, ready for LessonSpec and validation. */
+export function lessonFromGen(raw: unknown): unknown {
+  const l = raw as { engine?: string; scenes?: { motion?: MotionGen }[] };
+  if (l?.engine !== "motion" || !Array.isArray(l.scenes)) return raw;
+  return { ...l, scenes: l.scenes.map(s => (s.motion ? { ...s, motion: fromGen(s.motion) } : s)) };
+}
+
+/** The example lesson in the AI's format. */
+export const genExample = (lesson: Lesson) => ({ ...lesson, scenes: lesson.scenes.map(s => (s.motion ? { ...s, motion: toGen(s.motion) } : s)) });

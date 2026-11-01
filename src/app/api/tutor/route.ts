@@ -96,7 +96,7 @@ export async function POST(req: Request) {
           : e instanceof Anthropic.RateLimitError ? "The tutor is busy right now. Try again in a minute."
           : e instanceof Anthropic.APIError ? `The AI service returned an error (${e.status}).`
           : "Something went wrong talking to the tutor.";
-        if (!(e instanceof Anthropic.APIError)) console.error("tutor stream failed", e);
+        console.error("tutor stream failed", e instanceof Anthropic.APIError ? `${e.status} ${e.message}` : e);
         send({ t: "error", v });
       }
       controller.close();

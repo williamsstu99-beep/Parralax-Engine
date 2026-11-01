@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { MOTION_EXAMPLE } from "./fixture";
 import { LessonSpec, type Lesson, type MotionDef } from "./lesson";
-import { findSolution, motionSetup } from "./motion";
+import { findSolution, fromGen, lessonFromGen, motionSetup, toGen, genExample } from "./motion";
+import { LESSON_FORMATS } from "./lesson";
 import { validateLesson } from "./validate";
 import type { MotionChallenge } from "../lens/motion/model";
 
@@ -57,5 +58,12 @@ describe("motion lesson validation", () => {
     expect(errorsOf(l)).toBe("");
     motion(l, 2).friction = 0.1; // already slides
     expect(errorsOf(l)).toMatch(/already complete/);
+  });
+
+  it("round-trips through the AI's generation format", () => {
+    const gen = genExample(MOTION_EXAMPLE);
+    expect(LESSON_FORMATS.motion.safeParse(gen).success).toBe(true);
+    expect(lessonFromGen(gen)).toEqual(MOTION_EXAMPLE);
+    for (const sc of MOTION_EXAMPLE.scenes) expect(fromGen(toGen(sc.motion!))).toEqual(sc.motion);
   });
 });
