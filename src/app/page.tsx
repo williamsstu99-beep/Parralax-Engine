@@ -9,7 +9,10 @@ export default function Home() {
         <h1 className="text-5xl tracking-tight sm:text-6xl"><Wordmark /></h1>
         <p className="text-lg text-[var(--muted)]">Make the invisible visible.</p>
       </div>
-      <Link href="/lab/circuits" className="rounded-xl bg-[var(--flow)] px-6 py-3 font-semibold text-[var(--ink)] hover:brightness-110">Open the circuits lab</Link>
+      <div className="flex flex-wrap justify-center gap-3">
+        <Link href="/lesson" className="rounded-xl bg-[var(--flow)] px-6 py-3 font-semibold text-[var(--ink)] hover:brightness-110">Build a lesson</Link>
+        <Link href="/lab/circuits" className="rounded-xl border border-[var(--line)] bg-[var(--panel)] px-6 py-3 font-semibold hover:bg-[var(--raise)]">Open the circuits lab</Link>
+      </div>
       <p className="font-mono text-xs uppercase tracking-[0.14em] text-[var(--dim)]">Powered by the Parallax Engine</p>
     </main>
   );

@@ -6,7 +6,7 @@ import {
   CATALOG, boardIdOf, buildNetlist, ends, hasDynamics, key, newId, route, samePt, terminals,
   type Board, type Part, type PartKind, type Pt, type Rot,
 } from "@/engine/lens/circuit/board";
-import { SAMPLES } from "@/engine/lens/circuit/samples";
+import { SAMPLES, type Sample } from "@/engine/lens/circuit/samples";
 import { initialTransientState, solveDC, step } from "@/engine/truth/circuit/solver";
 import type { Solution, TransientState } from "@/engine/truth/circuit/types";
 import { Mark, Wordmark } from "@/components/brand/Mark";
@@ -27,7 +27,8 @@ type Action =
   | { type: "load"; sampleId: string }
   | { type: "commit"; board: Board; select?: Sel }
   | { type: "select"; sel: Sel }
-  | { type: "undo" };
+  | { type: "undo" }
+  | { type: "reset"; board: Board };
 
 const loadSample = (id: string) => structuredClone(SAMPLES.find(s => s.id === id)!.board);
 
@@ -36,6 +37,7 @@ function reducer(s: LabState, a: Action): LabState {
     case "load": return { board: loadSample(a.sampleId), past: [], selected: null, sampleId: a.sampleId };
     case "commit": return { ...s, board: a.board, past: [...s.past.slice(-49), s.board], selected: a.select === undefined ? s.selected : a.select };
     case "select": return { ...s, selected: a.sel };
+    case "reset": return { ...s, board: structuredClone(a.board), past: [...s.past.slice(-49), s.board], selected: null };
     case "undo": return s.past.length ? { ...s, board: s.past[s.past.length - 1], past: s.past.slice(0, -1), selected: null } : s;
   }
 }
@@ -52,15 +54,15 @@ const mix = (t: number) => {
 
 /* ---------------- component ---------------- */
 
-export default function CircuitLab() {
-  const [state, dispatch] = useReducer(reducer, null, () => ({ board: loadSample("bulb"), past: [], selected: null, sampleId: "bulb" }));
+export default function CircuitLab({ initial, embedded = false }: { initial?: Sample; embedded?: boolean } = {}) {
+  const [state, dispatch] = useReducer(reducer, null, () => ({ board: structuredClone(initial?.board ?? loadSample("bulb")), past: [], selected: null, sampleId: initial?.id ?? "bulb" }));
   const [preview, setPreview] = useState<Board | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [mode, setMode] = useState<"select" | "wire">("select");
   const [armed, setArmed] = useState<PartKind | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const board = preview ?? state.board;
-  const sample = SAMPLES.find(s => s.id === state.sampleId)!;
+  const sample = initial ?? SAMPLES.find(s => s.id === state.sampleId)!;
 
   /* ---- Truth ---- */
   const net = useMemo(() => buildNetlist(board), [board]);
@@ -241,8 +243,18 @@ export default function CircuitLab() {
   const hoverPart = hover ? board.parts.find(p => p.id === hover) : undefined;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--ink)] text-[var(--fg)]">
+    <div className={`flex flex-col text-[var(--fg)] ${embedded ? "" : "min-h-screen bg-[var(--ink)]"}`}>
       {/* top bar */}
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 pb-3">
+          <button onClick={() => setMode(m => (m === "wire" ? "select" : "wire"))} aria-pressed={mode === "wire"}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium ${mode === "wire" ? "border-[var(--flow)] bg-[#16294A] text-[var(--flow)]" : "border-[var(--line)] bg-[var(--raise)]"}`}>
+            Draw wires <kbd className="ml-1 font-mono text-xs text-[var(--muted)]">W</kbd>
+          </button>
+          <button onClick={() => dispatch({ type: "undo" })} disabled={!state.past.length} className="rounded-lg border border-[var(--line)] bg-[var(--raise)] px-3 py-2 text-sm disabled:opacity-40">Undo</button>
+          <button onClick={() => initial && dispatch({ type: "reset", board: initial.board })} className="rounded-lg border border-[var(--line)] bg-[var(--raise)] px-3 py-2 text-sm">Reset</button>
+        </div>
+      ) : (
       <header className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-[var(--line)] px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5 text-[19px]"><Mark size={28} /><Wordmark /></Link>
         <span className="hidden text-[var(--muted)] sm:inline">/</span>
@@ -262,8 +274,9 @@ export default function CircuitLab() {
           <button onClick={() => commit({ parts: [], wires: [] }, null)} className="rounded-lg border border-[var(--line)] bg-[var(--raise)] px-3 py-2 text-sm">Clear</button>
         </div>
       </header>
+      )}
 
-      <div className="grid flex-1 gap-4 p-4 sm:p-6 lg:grid-cols-[132px_minmax(0,1fr)_320px]">
+      <div className={`grid flex-1 gap-4 lg:grid-cols-[132px_minmax(0,1fr)_320px] ${embedded ? "" : "p-4 sm:p-6"}`}>
         {/* tray */}
         <aside aria-label="Components" className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
           <p className="hidden font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--muted)] lg:block">Components</p>

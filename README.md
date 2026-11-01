@@ -14,7 +14,7 @@ Students and teachers ask for a concept. The engine builds an accurate, interact
 
 - [x] Circuit Truth solver (`src/engine/truth/circuit`) with 15 passing tests
 - [x] Interactive circuit workspace (`/lab/circuits`): drag-and-drop parts, wiring, live current flow, diagnostics, LED challenge, capacitor transients
-- [ ] Lesson Spec + AI generation
+- [x] Lesson Spec + AI generation (`/lesson`, `src/engine/spec`): the AI writes a structured lesson; the engine validates every circuit with the solver and sends errors back for automatic repair
 - [ ] AI tutor (text, then voice)
 - [ ] Physics and biology engines
 
@@ -25,3 +25,5 @@ npm install
 npm test
 npm run dev
 ```
+
+Lesson generation needs `ANTHROPIC_API_KEY` in the environment. Without it, `/lesson` still shows a pre-made example lesson.
