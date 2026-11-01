@@ -25,7 +25,7 @@ export function sceneBoard(scene: Scene): Board {
   };
 }
 
-const partLabel = (board: Board, id: string) => {
+export const partLabel = (board: Board, id: string) => {
   const p = board.parts.find(q => q.id === id);
   if (!p) return id;
   const same = board.parts.filter(q => q.kind === p.kind);

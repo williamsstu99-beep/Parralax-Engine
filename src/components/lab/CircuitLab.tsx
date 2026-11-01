@@ -54,7 +54,7 @@ const mix = (t: number) => {
 
 /* ---------------- component ---------------- */
 
-export default function CircuitLab({ initial, embedded = false }: { initial?: Sample; embedded?: boolean } = {}) {
+export default function CircuitLab({ initial, embedded = false, onBoardChange }: { initial?: Sample; embedded?: boolean; onBoardChange?: (board: Board) => void } = {}) {
   const [state, dispatch] = useReducer(reducer, null, () => ({ board: structuredClone(initial?.board ?? loadSample("bulb")), past: [], selected: null, sampleId: initial?.id ?? "bulb" }));
   const [preview, setPreview] = useState<Board | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -63,6 +63,8 @@ export default function CircuitLab({ initial, embedded = false }: { initial?: Sa
   const [hover, setHover] = useState<string | null>(null);
   const board = preview ?? state.board;
   const sample = initial ?? SAMPLES.find(s => s.id === state.sampleId)!;
+  // Report committed edits (not drag previews), e.g. so the tutor can see the student's board.
+  useEffect(() => { onBoardChange?.(state.board); }, [state.board, onBoardChange]);
 
   /* ---- Truth ---- */
   const net = useMemo(() => buildNetlist(board), [board]);

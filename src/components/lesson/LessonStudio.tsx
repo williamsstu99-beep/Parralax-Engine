@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CircuitLab from "@/components/lab/CircuitLab";
+import TutorPanel from "@/components/lesson/TutorPanel";
 import { Mark, Wordmark } from "@/components/brand/Mark";
 import { EXAMPLE_LESSON } from "@/engine/spec/fixture";
 import type { Lesson } from "@/engine/spec/lesson";
 import { sceneBoard, toChallenge } from "@/engine/spec/validate";
 import type { Sample } from "@/engine/lens/circuit/samples";
+import type { Board } from "@/engine/lens/circuit/board";
 
 const EXAMPLES = [
   "Year 9: why do bulbs in series get dimmer?",
@@ -117,6 +119,10 @@ function LessonView({ lesson, example }: { lesson: Lesson; example: boolean }) {
     id: `scene-${sceneIdx}`, title: scene.heading, summary: scene.intro, board: sceneBoard(scene),
     challenge: scene.challenge ? toChallenge(scene.challenge) : undefined,
   }), [scene, sceneIdx]);
+  // The student's live board, read by the tutor when they send a message.
+  const board = useRef<Board>(sample.board);
+  const onBoardChange = useCallback((b: Board) => { board.current = b; }, []);
+  const getBoard = useCallback(() => board.current, []);
 
   return (
     <main className="flex flex-col gap-6 px-4 py-6 sm:px-6">
@@ -142,7 +148,7 @@ function LessonView({ lesson, example }: { lesson: Lesson; example: boolean }) {
 
       <section className="flex flex-col gap-4">
         <p className="max-w-3xl text-[17px] leading-relaxed">{scene.intro}</p>
-        <CircuitLab key={sample.id} initial={sample} embedded />
+        <CircuitLab key={sample.id} initial={sample} embedded onBoardChange={onBoardChange} />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -167,6 +173,8 @@ function LessonView({ lesson, example }: { lesson: Lesson; example: boolean }) {
       </section>
 
       <Questions lesson={lesson} />
+
+      <TutorPanel lesson={lesson} sceneIdx={sceneIdx} getBoard={getBoard} />
 
       <details className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5">
         <summary className="cursor-pointer text-lg font-semibold">Teacher notes</summary>

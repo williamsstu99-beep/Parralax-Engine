@@ -15,7 +15,8 @@ Students and teachers ask for a concept. The engine builds an accurate, interact
 - [x] Circuit Truth solver (`src/engine/truth/circuit`) with 15 passing tests
 - [x] Interactive circuit workspace (`/lab/circuits`): drag-and-drop parts, wiring, live current flow, diagnostics, LED challenge, capacitor transients
 - [x] Lesson Spec + AI generation (`/lesson`, `src/engine/spec`): the AI writes a structured lesson; the engine validates every circuit with the solver and sends errors back for automatic repair
-- [ ] AI tutor (text, then voice)
+- [x] AI tutor, text (`/api/tutor`, `src/engine/tutor`): a chat panel in every lesson. The server solves the student's current board with the Truth solver and gives the tutor those readings, so it only quotes real numbers. Readings go in as system messages, so a student can't fake them by typing.
+- [ ] AI tutor, voice
 - [ ] Physics and biology engines
 
 ## Development
@@ -26,4 +27,4 @@ npm test
 npm run dev
 ```
 
-Lesson generation needs an Anthropic API key in `PARALLAX_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`; Claude Code cloud environments reserve that name, so use the first one there). Without it, `/lesson` still shows a pre-made example lesson.
+Lesson generation needs an Anthropic API key in `PARALLAX_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`; Claude Code cloud environments reserve that name, so use the first one there). Without it, `/lesson` still shows a pre-made example lesson, but the tutor won't answer.
