@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* Dynamic Learning: a dark lab. The simulation is the brightest thing on screen. */
+:root {
+  --ink: #0a0f1c;
+  --panel: #131b2e;
+  --raise: #18223a;
+  --line: #243150;
+  --fg: #eef2fa;
+  --muted: #8c99b4;
+  --dim: #55617d;
+  --volt: #ffb547;
+  --flow: #7fd8ff;
+  --good: #6fd39b;
+  --bad: #ff7a6b;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--ink);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--flow);
+  outline-offset: 2px;
+}
