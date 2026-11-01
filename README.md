@@ -27,4 +27,6 @@ npm test
 npm run dev
 ```
 
+The site is behind an "Enter code" screen (`src/proxy.ts`). The code is `ACCESS_CODE` (default `4145`); changing it signs everyone out. The AI routes check it too.
+
 Lesson generation needs an Anthropic API key in `PARALLAX_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`; Claude Code cloud environments reserve that name, so use the first one there). Without it, `/lesson` still shows a pre-made example lesson, but the tutor won't answer.

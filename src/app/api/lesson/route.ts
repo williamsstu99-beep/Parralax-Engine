@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { cookies } from "next/headers";
+import { ACCESS_COOKIE, hasAccess } from "@/lib/access";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { LessonSpec, type Lesson } from "@/engine/spec/lesson";
 import { LESSON_SYSTEM, lessonRequest, repairRequest } from "@/engine/spec/prompt";
@@ -10,6 +12,8 @@ const MODEL = "claude-opus-5-5";
 const MAX_ATTEMPTS = 3;
 
 export async function POST(req: Request) {
+  // Checked here as well as in the proxy, so these paid endpoints never rely on the matcher alone.
+  if (!(await hasAccess((await cookies()).get(ACCESS_COOKIE)?.value))) return Response.json({ error: "Enter the access code first." }, { status: 401 });
   const body = await req.json().catch(() => null) as { request?: unknown } | null;
   const request = typeof body?.request === "string" ? body.request.trim() : "";
   if (!request) return Response.json({ error: "Describe what you'd like to learn or teach." }, { status: 400 });

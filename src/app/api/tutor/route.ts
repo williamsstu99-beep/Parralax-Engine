@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { cookies } from "next/headers";
+import { ACCESS_COOKIE, hasAccess } from "@/lib/access";
 import { z } from "zod";
 import { LessonSpec, PartSpec, WireSpec } from "@/engine/spec/lesson";
 import { sceneBoard } from "@/engine/spec/validate";
@@ -20,6 +22,8 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
+  // Checked here as well as in the proxy, so these paid endpoints never rely on the matcher alone.
+  if (!(await hasAccess((await cookies()).get(ACCESS_COOKIE)?.value))) return Response.json({ error: "Enter the access code first." }, { status: 401 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "That tutor request wasn't in the expected format." }, { status: 400 });
   const { lesson, sceneIndex, board, messages } = parsed.data;
