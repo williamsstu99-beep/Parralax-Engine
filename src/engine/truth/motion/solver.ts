@@ -115,6 +115,15 @@ export function solveProjectile(s: ProjectileSetup): MotionResult {
 
 /* ---------------- ramps ---------------- */
 
+/** The forces on the block along the slope when it moves at velocity v (for free-body diagrams). */
+export function rampForces(s: RampSetup, v: number): ForceSet {
+  const g = GRAVITY[s.planet], th = rad(s.angle);
+  const N = s.mass * g * Math.cos(th), W = s.mass * g * Math.sin(th), fMax = s.friction * N;
+  const tendency = s.force - W;
+  const friction = Math.abs(v) > 1e-9 ? -Math.sign(v) * fMax : Math.abs(tendency) <= fMax + 1e-9 ? -tendency : -Math.sign(tendency) * fMax;
+  return { weightAlong: -W, normal: N, friction, applied: s.force, net: tendency + friction };
+}
+
 interface Phase { t0: number; x0: number; v0: number; a: number; dur: number; lost0: number; work0: number }
 
 const EPS = 1e-9;
@@ -147,11 +156,7 @@ export function solveRamp(s: RampSetup): MotionResult {
     return { a: (net - Math.sign(net) * fMax) / s.mass, held: false };
   };
 
-  // Forces at the start, for free-body diagrams.
-  const start = accel(s.startSpeed);
-  const startFriction = Math.abs(s.startSpeed) > EPS ? -Math.sign(s.startSpeed) * fMax
-    : start.held ? -(s.force - W) : -Math.sign(s.force - W) * fMax;
-  const forces: ForceSet = { weightAlong: -W, normal: N, friction: startFriction, applied: s.force, net: s.force - W + startFriction };
+  const forces = rampForces(s, s.startSpeed);
 
   const phases: Phase[] = [];
   let t = 0, x = Math.min(L, Math.max(0, s.start)), v = s.startSpeed, lost = 0, work = 0;
