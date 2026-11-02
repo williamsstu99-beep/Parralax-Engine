@@ -372,7 +372,7 @@ function Slider({ id, def, value, disabled, onChange }: { id: string; def: Param
         <span className="font-mono tabular-nums text-[var(--volt)]">{+value.toFixed(2)}{def.unit ? ` ${def.unit}` : ""}</span>
       </div>
       <input id={id} type="range" min={def.min} max={def.max} step={def.step} value={value} disabled={disabled}
-        onChange={e => onChange(Number(e.target.value))} className="w-full accent-[#7FD8FF]" />
+        onChange={e => onChange(Number(e.target.value))} className="w-full" style={{ "--fill": `${((value - def.min) / (def.max - def.min || 1)) * 100}%` } as React.CSSProperties} />
     </div>
   );
 }

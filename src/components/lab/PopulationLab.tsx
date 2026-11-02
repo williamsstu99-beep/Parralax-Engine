@@ -288,7 +288,7 @@ function LogSlider({ id, def, value, disabled, onChange }: { id: string; def: Po
         <label htmlFor={id}>{def.label}{disabled && <span className="ml-1.5 text-xs text-[var(--muted)]">(locked)</span>}</label>
         <span className="font-mono tabular-nums text-[var(--volt)]">{count(value)}</span>
       </div>
-      <input id={id} type="range" min={0} max={1000} step={1} value={toPos(value)} disabled={disabled} onChange={e => onChange(fromPos(Number(e.target.value)))} className="w-full accent-[#7FD8FF]" />
+      <input id={id} type="range" min={0} max={1000} step={1} value={toPos(value)} disabled={disabled} onChange={e => onChange(fromPos(Number(e.target.value)))} className="w-full" style={{ "--fill": `${toPos(value) / 10}%` } as React.CSSProperties} />
     </div>
   );
 }
@@ -300,7 +300,7 @@ function Slider({ id, def, value, disabled, onChange }: { id: string; def: PopPa
         <label htmlFor={id}>{def.label}{disabled && <span className="ml-1.5 text-xs text-[var(--muted)]">(locked)</span>}</label>
         <span className="font-mono tabular-nums text-[var(--volt)]">{def.percent ? `${Math.round(value * 100)}%` : +value.toFixed(3)}{def.unit && !def.percent ? ` ${def.unit}` : def.percent ? " a year" : ""}</span>
       </div>
-      <input id={id} type="range" min={def.min} max={def.max} step={def.step} value={value} disabled={disabled} onChange={e => onChange(Number(e.target.value))} className="w-full accent-[#7FD8FF]" />
+      <input id={id} type="range" min={def.min} max={def.max} step={def.step} value={value} disabled={disabled} onChange={e => onChange(Number(e.target.value))} className="w-full" style={{ "--fill": `${((value - def.min) / (def.max - def.min || 1)) * 100}%` } as React.CSSProperties} />
     </div>
   );
 }
