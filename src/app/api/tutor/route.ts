@@ -4,7 +4,8 @@ import { ACCESS_COOKIE, hasAccess } from "@/lib/access";
 import { z } from "zod";
 import { LessonSpec, PartSpec, WireSpec } from "@/engine/spec/lesson";
 import { sceneBoard } from "@/engine/spec/validate";
-import { boardSnapshot, motionSnapshot } from "@/engine/tutor/snapshot";
+import { boardSnapshot, motionSnapshot, populationSnapshot } from "@/engine/tutor/snapshot";
+import { popScene } from "@/engine/spec/population";
 import type { MotionChallenge } from "@/engine/lens/motion/model";
 import { TUTOR_SYSTEM, boardMessage, lessonContext, type TutorEvent } from "@/engine/tutor/prompt";
 
@@ -34,6 +35,11 @@ const Body = z.object({
     wires: z.array(WireSpec.extend({ points: WireSpec.shape.points.max(40) })).max(120),
   }).optional(),
   motion: MotionSetupSchema.optional(),
+  population: z.object({
+    prey: z.number().min(0).max(1e6), predators: z.number().min(0).max(1e5), growth: z.number().min(0).max(5), capacity: z.number().min(1).max(1e6),
+    hunting: z.number().min(0).max(1000), conversion: z.number().min(0).max(1), predatorDeath: z.number().min(0).max(5),
+    trapping: z.number().min(0).max(0.99), harvest: z.number().min(0).max(0.99), controlStart: z.number().min(0).max(200), years: z.number().min(1).max(200),
+  }).optional(),
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(4000) })).min(1).max(40),
 });
 
@@ -42,7 +48,7 @@ export async function POST(req: Request) {
   if (!(await hasAccess((await cookies()).get(ACCESS_COOKIE)?.value))) return Response.json({ error: "Enter the access code first." }, { status: 401 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "That tutor request wasn't in the expected format." }, { status: 400 });
-  const { lesson, sceneIndex, board, motion, messages } = parsed.data;
+  const { lesson, sceneIndex, board, motion, population, messages } = parsed.data;
   const scene = lesson.scenes[sceneIndex];
   if (!scene) return Response.json({ error: "That scene isn't in the lesson." }, { status: 400 });
   if (messages[0].role !== "user" || messages[messages.length - 1].role !== "user") {
@@ -55,12 +61,11 @@ export async function POST(req: Request) {
   const client = new Anthropic({ apiKey, baseURL: process.env.PARALLAX_ANTHROPIC_BASE_URL ?? "https://api.anthropic.com" });
 
   // Truth: solve the student's simulation on the server, so the tutor only ever quotes real readings.
-  if (lesson.engine === "circuits" ? !board : !motion || !scene.motion) {
-    return Response.json({ error: "The tutor needs the simulation for this scene." }, { status: 400 });
-  }
-  const snap = lesson.engine === "circuits"
-    ? boardSnapshot(sceneBoard({ ...scene, board }), scene.challenge)
-    : motionSnapshot(motion!, scene.motion!.challenge as MotionChallenge | undefined, scene.motion!.editable);
+  const missing = lesson.engine === "circuits" ? !board : lesson.engine === "motion" ? !motion || !scene.motion : !population || !scene.population;
+  if (missing) return Response.json({ error: "The tutor needs the simulation for this scene." }, { status: 400 });
+  const snap = lesson.engine === "circuits" ? boardSnapshot(sceneBoard({ ...scene, board }), scene.challenge)
+    : lesson.engine === "motion" ? motionSnapshot(motion!, scene.motion!.challenge as MotionChallenge | undefined, scene.motion!.editable)
+    : (() => { const ps = popScene(scene.population!, "", "", ""); return populationSnapshot(population!, ps.names, ps.challenge, scene.population!.editable); })();
 
   const stream = client.beta.messages.stream({
     model: MODEL,

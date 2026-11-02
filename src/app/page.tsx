@@ -13,6 +13,7 @@ export default function Home() {
         <Link href="/lesson" className="rounded-xl bg-[var(--flow)] px-6 py-3 font-semibold text-[var(--ink)] hover:brightness-110">Build a lesson</Link>
         <Link href="/lab/circuits" className="rounded-xl border border-[var(--line)] bg-[var(--panel)] px-6 py-3 font-semibold hover:bg-[var(--raise)]">Open the circuits lab</Link>
         <Link href="/lab/motion" className="rounded-xl border border-[var(--line)] bg-[var(--panel)] px-6 py-3 font-semibold hover:bg-[var(--raise)]">Open the motion lab</Link>
+        <Link href="/lab/populations" className="rounded-xl border border-[var(--line)] bg-[var(--panel)] px-6 py-3 font-semibold hover:bg-[var(--raise)]">Open the populations lab</Link>
       </div>
       <p className="font-mono text-xs uppercase tracking-[0.14em] text-[var(--dim)]">Powered by the Parallax Engine</p>
     </main>

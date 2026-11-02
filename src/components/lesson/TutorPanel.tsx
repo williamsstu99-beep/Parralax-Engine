@@ -4,11 +4,12 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { Mark } from "@/components/brand/Mark";
 import type { Board } from "@/engine/lens/circuit/board";
 import type { MotionSetup } from "@/engine/truth/motion/types";
+import type { PopulationSetup } from "@/engine/truth/population/solver";
 import type { Lesson } from "@/engine/spec/lesson";
 import type { TutorEvent } from "@/engine/tutor/prompt";
 
-/** What the student has in front of them: a circuit board or motion settings. */
-export interface Sim { board?: Board; motion?: MotionSetup }
+/** What the student has in front of them: a circuit board, motion settings or population settings. */
+export interface Sim { board?: Board; motion?: MotionSetup; population?: PopulationSetup }
 
 interface Msg { role: "user" | "assistant"; content: string; error?: boolean }
 

@@ -75,12 +75,45 @@ export const MotionSpec = z.object({
   }).optional(),
 });
 
+export const POP_FIELDS = ["prey_start", "predator_start", "growth", "capacity", "hunting", "conversion", "predator_death", "trapping", "harvest", "control_start", "years"] as const;
+
+/** A population simulation. Every field is required (null where unused) so it stays small for structured output. */
+export const PopulationSpec = z.object({
+  prey_name: z.string().describe("Plural, lower case, e.g. 'rabbits' or 'native birds'"),
+  predator_name: z.string().nullable().describe("Plural, lower case, e.g. 'stoats'; null for prey on their own"),
+  prey_start: z.number().describe("Starting prey numbers"),
+  predator_start: z.number().describe("Starting predator numbers; 0 for prey on their own"),
+  growth: z.number().describe("Prey growth rate per year when there's plenty of room"),
+  capacity: z.number().describe("Carrying capacity: how many prey the habitat supports"),
+  hunting: z.number().describe("Prey eaten per predator per year when prey are at carrying capacity; 0 without predators"),
+  conversion: z.number().describe("New predators born per prey eaten; 0 without predators"),
+  predator_death: z.number().describe("Predator death rate per year; 0 without predators"),
+  trapping: z.number().describe("Fraction of predators trapped each year once control starts, 0 to 0.95"),
+  harvest: z.number().describe("Fraction of prey harvested each year once control starts, 0 to 0.95"),
+  control_start: z.number().describe("Year trapping and harvesting start"),
+  years: z.number().describe("How many years to simulate"),
+  editable: z.array(z.enum(POP_FIELDS)).describe("Settings the student may change"),
+  challenge: z.object({
+    title: z.string(),
+    goal: z.string().describe("One sentence telling the student what to achieve"),
+    checks: z.array(z.object({
+      kind: z.enum(["final_between", "never_below", "max_below", "survives", "goes_extinct"]),
+      species: z.enum(["prey", "predators"]),
+      min: z.number().nullable().describe("final_between and never_below: lower bound; otherwise null"),
+      max: z.number().nullable().describe("final_between and max_below: upper bound; otherwise null"),
+    })).describe("All must pass for the challenge to be complete"),
+    hint_if_stuck: z.string(),
+    success: z.string().describe("Short message shown when they succeed"),
+  }).nullable().describe("A challenge, or null for a demo scene"),
+});
+
 export const SceneSpec = z.object({
   heading: z.string(),
   intro: z.string().describe("2-3 sentences to the student before they start"),
   board: z.object({ parts: z.array(PartSpec), wires: z.array(WireSpec) }).optional().describe("circuits lessons only: the circuit"),
   challenge: ChallengeSpec.optional().describe("circuits lessons only"),
   motion: MotionSpec.optional().describe("motion lessons only: the simulation"),
+  population: PopulationSpec.optional().describe("populations lessons only: the simulation"),
   explain: z.object({
     simple: z.string().describe("Everyday analogy, no jargon"),
     intermediate: z.string().describe("Scientific terms appropriate to the year level"),
@@ -97,7 +130,7 @@ export const QuestionSpec = z.object({
 });
 
 export const LessonSpec = z.object({
-  engine: z.enum(["circuits", "motion"]).describe("Which simulation engine every scene uses"),
+  engine: z.enum(["circuits", "motion", "populations"]).describe("Which simulation engine every scene uses"),
   title: z.string(),
   year_level: z.number().describe("New Zealand year level, 6 to 13"),
   objective: z.string(),
@@ -114,7 +147,7 @@ export type Lesson = z.infer<typeof LessonSpec>;
  * large for structured output, so the route picks the engine first and asks
  * for a lesson in that engine's shape. Results still parse as LessonSpec.
  */
-const SceneCommon = SceneSpec.omit({ board: true, challenge: true, motion: true });
+const SceneCommon = SceneSpec.omit({ board: true, challenge: true, motion: true, population: true });
 export const LESSON_FORMATS = {
   circuits: LessonSpec.extend({
     engine: z.literal("circuits"),
@@ -123,6 +156,10 @@ export const LESSON_FORMATS = {
   motion: LessonSpec.extend({
     engine: z.literal("motion"),
     scenes: z.array(SceneCommon.extend({ motion: z.lazy(() => MotionGenSpec) })).describe("1 to 4 scenes, building up"),
+  }),
+  populations: LessonSpec.extend({
+    engine: z.literal("populations"),
+    scenes: z.array(SceneCommon.extend({ population: PopulationSpec })).describe("1 to 4 scenes, building up"),
   }),
 };
 
@@ -169,9 +206,10 @@ export const MotionGenSpec = z.object({
 export type MotionGen = z.infer<typeof MotionGenSpec>;
 
 /** Schema for the quick first step that picks the engine. */
-export const EngineChoice = z.object({ engine: z.enum(["circuits", "motion"]) });
+export const EngineChoice = z.object({ engine: z.enum(["circuits", "motion", "populations"]) });
 export type Scene = z.infer<typeof SceneSpec>;
 export type ChallengeDef = z.infer<typeof ChallengeSpec>;
 export type Check = z.infer<typeof CheckSpec>;
 export type MotionDef = z.infer<typeof MotionSpec>;
+export type PopulationDef = z.infer<typeof PopulationSpec>;
 export type Engine = Lesson["engine"];

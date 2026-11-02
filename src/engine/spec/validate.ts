@@ -12,6 +12,7 @@ import { solveDC } from "../truth/circuit/solver";
 import type { Solution } from "../truth/circuit/types";
 import type { ChallengeDef, Check, Lesson, Scene } from "./lesson";
 import { validateMotion } from "./motion";
+import { validatePopulation } from "./population";
 
 export const GRID = { w: 22, h: 14 };
 
@@ -156,13 +157,17 @@ export function validateLesson(lesson: Lesson): ValidationResult {
   lesson.scenes.forEach((s, i) => {
     const where = `scene ${i + 1} ("${s.heading}")`;
     if (lesson.engine === "circuits") {
-      if (s.motion) out.errors.push(`${where}: this is a circuits lesson, so remove "motion"`);
+      if (s.motion || s.population) out.errors.push(`${where}: this is a circuits lesson, so remove "motion" and "population"`);
       if (!s.board) out.errors.push(`${where}: circuits scenes need a board`);
       else validateBoard({ ...s, board: s.board }, where, out);
-    } else {
-      if (s.board || s.challenge) out.errors.push(`${where}: this is a motion lesson, so remove "board" and "challenge" (put challenges inside "motion")`);
+    } else if (lesson.engine === "motion") {
+      if (s.board || s.challenge || s.population) out.errors.push(`${where}: this is a motion lesson, so remove "board", "challenge" and "population" (put challenges inside "motion")`);
       if (!s.motion) out.errors.push(`${where}: motion scenes need "motion"`);
       else validateMotion(s.motion, where, out);
+    } else {
+      if (s.board || s.challenge || s.motion) out.errors.push(`${where}: this is a populations lesson, so remove "board", "challenge" and "motion" (put challenges inside "population")`);
+      if (!s.population) out.errors.push(`${where}: populations scenes need "population"`);
+      else validatePopulation(s.population, where, out);
     }
   });
   return out;

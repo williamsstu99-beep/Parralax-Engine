@@ -12,6 +12,8 @@ import { partLabel, toChallenge } from "../spec/validate";
 import { BODIES, evalChallenge, type MotionChallenge } from "../lens/motion/model";
 import { rampForces, solveMotion } from "../truth/motion/solver";
 import { GRAVITY, type MotionSetup, type Planet } from "../truth/motion/types";
+import { solvePopulation, type PopulationSetup } from "../truth/population/solver";
+import { evalPopChallenge, type PopChallenge, type PopNames } from "../lens/population/model";
 
 const amps = (a: number) => {
   const x = Math.abs(a);
@@ -119,6 +121,33 @@ export function motionSnapshot(setup: MotionSetup, challenge?: MotionChallenge, 
   let challengeDone: boolean | null = null;
   if (challenge) {
     const res = evalChallenge(challenge, r);
+    challengeDone = res.done;
+    lines.push(`Challenge "${challenge.title}" (${challenge.goal}): if they ran these settings now it would ${res.done ? "SUCCEED" : `not succeed yet. Engine feedback: ${res.hint}`} (the student only sees the result after they run it, so don't give the outcome away).`);
+  }
+  return { text: lines.join("\n"), challengeDone };
+}
+
+/* ---------------- populations ---------------- */
+
+const pc = (n: number) => (n >= 100 ? Math.round(n).toLocaleString("en-NZ") : +n.toFixed(1)).toString();
+
+/** Solve the student's current population settings and describe them for the tutor. */
+export function populationSnapshot(setup: PopulationSetup, names: PopNames, challenge?: PopChallenge, editable?: string[]): Snapshot {
+  const r = solvePopulation(setup), sm = r.summary, hasPred = setup.predators > 0;
+  const lines: string[] = [];
+  lines.push(`Populations lab. Settings: ${pc(setup.prey)} ${names.prey} to start, growth rate ${setup.growth} per year, carrying capacity ${pc(setup.capacity)}.`);
+  if (hasPred) lines.push(`Predators: ${pc(setup.predators)} ${names.predators} to start; each eats ${setup.hunting} ${names.prey} a year at full prey numbers; ${setup.conversion} new ${names.predators} per ${names.prey.replace(/s$/, "")} eaten; death rate ${setup.predatorDeath} per year.`);
+  else lines.push(`No predators.`);
+  if (setup.trapping > 0 || setup.harvest > 0) lines.push(`Control from year ${setup.controlStart}: ${Math.round(setup.trapping * 100)}% of ${names.predators} trapped and ${Math.round(setup.harvest * 100)}% of ${names.prey} harvested each year.`);
+  lines.push(`Solver result over ${setup.years} years: ${names.prey} end at ${pc(sm.final.prey)} (range ${pc(sm.min.prey)} to ${pc(sm.max.prey)})${hasPred ? `; ${names.predators} end at ${pc(sm.final.predators)} (range ${pc(sm.min.predators)} to ${pc(sm.max.predators)})` : ""}.`);
+  if (sm.extinct.prey !== undefined) lines.push(`The ${names.prey} die out in year ${sm.extinct.prey.toFixed(1)}.`);
+  if (hasPred && sm.extinct.predators !== undefined) lines.push(`The ${names.predators} die out in year ${sm.extinct.predators.toFixed(1)}.`);
+  if (sm.equilibrium) lines.push(`Without control, the populations balance around ${pc(sm.equilibrium.prey)} ${names.prey} and ${pc(sm.equilibrium.predators)} ${names.predators}.`);
+  if (sm.cycleYears !== undefined) lines.push(`They cycle with a period of about ${sm.cycleYears.toFixed(1)} years.`);
+  if (editable?.length) lines.push(`The student can change: ${editable.join(", ")}.`);
+  let challengeDone: boolean | null = null;
+  if (challenge) {
+    const res = evalPopChallenge(challenge, r, names);
     challengeDone = res.done;
     lines.push(`Challenge "${challenge.title}" (${challenge.goal}): if they ran these settings now it would ${res.done ? "SUCCEED" : `not succeed yet. Engine feedback: ${res.hint}`} (the student only sees the result after they run it, so don't give the outcome away).`);
   }

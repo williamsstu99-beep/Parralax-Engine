@@ -164,3 +164,75 @@ export const MOTION_EXAMPLE: Lesson = {
   ],
   teacher_notes: "Misconception: heavier objects fall faster. Ask students to switch to the shot put in the free lab and compare. Extension: turn on air resistance and find the new best angle (lower than 45°).",
 };
+
+/** A hand-checked populations lesson: the worked example for population generation, and a test fixture. */
+export const POP_EXAMPLE: Lesson = {
+  engine: "populations",
+  title: "Predators, prey and pest control in Aotearoa",
+  year_level: 11,
+  objective: "Explain how food limits population growth, how predator and prey numbers affect each other, and why pest control must be sustained.",
+  key_ideas: [
+    "With plenty of room a population grows faster and faster, then levels off at the carrying capacity as food and space run short.",
+    "Predator numbers follow prey numbers: more prey feeds more predators, which then eat the prey down.",
+    "Trapping only works while it continues and removes predators faster than they can breed.",
+  ],
+  scenes: [
+    {
+      heading: "Room to grow",
+      intro: "Twenty rabbits arrive in an empty valley that can feed 3,000. Predict the shape of the graph, then run it.",
+      population: { prey_name: "rabbits", predator_name: null, prey_start: 20, predator_start: 0, growth: 1, capacity: 3000, hunting: 0, conversion: 0, predator_death: 0, trapping: 0, harvest: 0, control_start: 0, years: 20, editable: ["growth", "capacity"], challenge: null },
+      explain: {
+        simple: "At first there's loads of grass, so every rabbit family adds more rabbits. Later, food runs short and the numbers stop climbing.",
+        intermediate: "Growth is close to exponential while resources are plentiful. As the population nears the carrying capacity, competition for food slows growth until births balance deaths.",
+        advanced: "Logistic growth: dN/dt = rN(1 − N/K). Growth is fastest at N = K/2, and the solution is N(t) = K / (1 + ((K − N₀)/N₀)e^(−rt)).",
+      },
+      try_this: ["Double the growth rate. Does the final number change, or just how fast it gets there?", "Halve the carrying capacity. What happens to the curve?"],
+    },
+    {
+      heading: "Enter the stoats",
+      intro: "Stoats were brought to New Zealand in the 1880s to control rabbits. Watch how the two populations affect each other.",
+      population: { prey_name: "rabbits", predator_name: "stoats", prey_start: 2000, predator_start: 20, growth: 1, capacity: 5000, hunting: 150, conversion: 0.02, predator_death: 0.6, trapping: 0, harvest: 0, control_start: 0, years: 60, editable: ["hunting", "predator_death"], challenge: null },
+      explain: {
+        simple: "Lots of rabbits means lots of food for stoats, so stoats increase. Then they eat so many rabbits that food runs short, and the stoats decline. Round and round it goes.",
+        intermediate: "Predator numbers lag behind prey numbers. The cycles get smaller over time as both populations settle towards a balance point.",
+        advanced: "Lotka–Volterra predation with logistic prey: dP/dt = b·a·N·P − m·P. The balance point is N* = m/(b·a): prey numbers there are set by the predators' biology, not the prey's.",
+      },
+      try_this: ["Switch to the rabbits vs stoats view. What shape does the path make?", "Make stoats better hunters. Do rabbits settle higher or lower?"],
+    },
+    {
+      heading: "Bring the birds back",
+      intro: "Stoats also prey on native birds. Here they're holding a bird population at 300. Plan a trapping campaign to bring the birds back.",
+      population: {
+        prey_name: "native birds", predator_name: "stoats", prey_start: 300, predator_start: 25.5, growth: 0.6, capacity: 2000, hunting: 40, conversion: 0.0833, predator_death: 0.5, trapping: 0, harvest: 0, control_start: 5, years: 50, editable: ["trapping", "control_start"],
+        challenge: { title: "Bring the birds back", goal: "Get the bird population to at least 900 by year 50.", checks: [{ kind: "final_between", species: "prey", min: 900, max: 2000 }], hint_if_stuck: "Light trapping isn't enough: the stoats breed back. Try trapping most of them each year.", success: "The birds are recovering!" },
+      },
+      explain: {
+        simple: "Trap a few stoats and the rest soon breed to fill the gap. Trap most of them, every year, and the birds get a real chance.",
+        intermediate: "Trapping adds to the predators' death rate. If it's high enough, predators decline faster than they can breed, and prey recover towards the carrying capacity.",
+        advanced: "Trapping fraction f adds a removal rate T = −ln(1 − f), raising the prey balance point to N* = (m + T)/(b·a). Predators die out when b·a·K < m + T.",
+      },
+      try_this: ["Find the smallest trapping level that works.", "Start trapping later. Does it still work by year 50?"],
+    },
+  ],
+  questions: [
+    {
+      question: "A rabbit population levels off even with no predators. Why?",
+      choices: ["They run out of food and space", "Rabbits stop breeding when they're old", "The weather changes", "Rabbits can only live 20 years"],
+      answer_index: 0,
+      explanation: "Competition for limited resources slows growth until births balance deaths: the carrying capacity.",
+    },
+    {
+      question: "In a predator–prey cycle, when do predator numbers usually peak?",
+      choices: ["Before the prey peak", "At exactly the same time as the prey", "Only when prey are extinct", "Shortly after the prey peak"],
+      answer_index: 3,
+      explanation: "Predators need time to breed on plentiful food, so their peak lags behind the prey peak.",
+    },
+    {
+      question: "Why does trapping a small fraction of stoats each year barely help the birds?",
+      choices: ["Traps catch birds too", "The stoats breed back faster than they're removed", "Stoats avoid traps forever", "Birds don't need protection"],
+      answer_index: 1,
+      explanation: "Unless removal outpaces breeding, the stoat population recovers and keeps eating birds.",
+    },
+  ],
+  teacher_notes: "The model is simplified: real stoats eat many prey species (rabbits, rats, birds), so they don't depend on one prey. Link to Predator Free 2050 and local trapping groups. Misconception: one big trapping effort fixes the problem; ask students to stop trapping after year 30 in the free lab and watch what happens.",
+};
