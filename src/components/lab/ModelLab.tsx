@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModelSceneDef, ModelSpecDef } from "@/engine/spec/lesson";
 import { evalModelChallenge, labelsOf, modelDef } from "@/engine/spec/model";
 import { compileModel, runModel, type ModelRun } from "@/engine/truth/model/solver";
+import ChallengeBanner from "./ChallengeBanner";
 
 /* ---------------- helpers ---------------- */
 
@@ -110,16 +111,7 @@ export default function ModelLab({ model, scene, onValuesChange }: { model: Mode
     <div className="grid gap-5 text-[var(--fg)] lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="flex min-w-0 flex-col gap-5">
         {scene.challenge && (
-          <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border px-5 py-3.5 transition-colors ${challenge?.done ? "border-[var(--good)]/50 bg-[rgba(94,234,212,0.08)]" : "glass"}`}>
-            <span className={`flex h-8 w-8 items-center justify-center rounded-full ${challenge?.done ? "bg-[var(--good)] text-[#04120f]" : "bg-[rgba(255,181,71,0.14)] text-[var(--volt)]"}`}>
-              {challenge?.done ? "✓" : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.5" fill="currentColor" /></svg>}
-            </span>
-            <div className="min-w-0">
-              <p className="font-medium">{scene.challenge.title}</p>
-              <p className="text-sm text-[var(--muted)]">{scene.challenge.goal}</p>
-            </div>
-            <span className={`ml-auto text-sm ${challenge?.done ? "font-medium text-[var(--good)]" : challenge ? "text-[var(--fg)]" : "text-[var(--muted)]"}`}>{challenge ? challenge.hint : "Run it to test your answer."}</span>
-          </div>
+          <ChallengeBanner title={scene.challenge.title} goal={scene.challenge.goal} done={!!challenge?.done} message={challenge ? challenge.hint : "Run it to test your answer."} />
         )}
 
         <div className="glass relative overflow-hidden rounded-[28px]">

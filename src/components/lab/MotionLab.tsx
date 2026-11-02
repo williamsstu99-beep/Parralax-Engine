@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Mark, Wordmark } from "@/components/brand/Mark";
+import ChallengeBanner from "./ChallengeBanner";
 import {
   BODIES, MOTION_SAMPLES, PLANETS, PROJECTILE_PARAMS, RAMP_PARAMS, canEdit, evalChallenge,
   type BodyKind, type MotionParam, type MotionScene, type ParamDef,
@@ -108,27 +109,20 @@ export default function MotionLab({ initial, embedded = false, onSetupChange }: 
           <span className="font-medium">Motion lab</span>
           <div className="ml-auto">
             <label htmlFor="motion-sample" className="sr-only">Load a scene</label>
-            <select id="motion-sample" value={sceneId} onChange={e => load(e.target.value)} className="rounded-lg border border-[var(--line)] bg-[var(--raise)] px-3 py-2 text-sm">
+            <select id="motion-sample" value={sceneId} onChange={e => load(e.target.value)} className="rounded-xl border border-[var(--line)] bg-black/30 px-3 py-2 text-sm">
               {MOTION_SAMPLES.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
             </select>
           </div>
         </header>
       )}
 
-      <div className={`grid flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px] ${embedded ? "" : "p-4 sm:p-6"}`}>
+      <div className={`grid flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px] ${embedded ? "" : "p-4 sm:p-6"}`}>
         <section className="flex min-w-0 flex-col gap-3">
           {scene.challenge && (
-            <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border px-4 py-3 ${challenge?.done ? "border-[var(--good)] bg-[#12291F]" : "border-[var(--line)] bg-[var(--panel)]"}`}>
-              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--volt)]">Challenge</span>
-              <span className="font-medium">{scene.challenge.title}</span>
-              <span className="text-sm text-[var(--muted)]">{scene.challenge.goal}</span>
-              <span className={`ml-auto text-sm font-medium ${challenge?.done ? "text-[var(--good)]" : ""}`}>
-                {challenge ? `${challenge.done ? "✓ " : ""}${challenge.hint}` : `${verb} to test your answer.`}
-              </span>
-            </div>
+            <ChallengeBanner title={scene.challenge.title} goal={scene.challenge.goal} done={!!challenge?.done} message={challenge ? challenge.hint : `${verb} to test your answer.`} />
           )}
 
-          <div className="relative w-full overflow-hidden rounded-2xl border border-[var(--line)] bg-[radial-gradient(120%_90%_at_50%_0%,#152039_0%,var(--ink)_70%)]">
+          <div className="glass anim-fade relative w-full overflow-hidden rounded-[28px]">
             {setup.kind === "projectile"
               ? <ProjectileView result={result} cur={cur} trails={trails} showFull={ran} body={body} />
               : <RampView result={result} cur={cur} />}
@@ -136,13 +130,13 @@ export default function MotionLab({ initial, embedded = false, onSetupChange }: 
 
           <div className="flex flex-wrap items-center gap-2">
             {playing
-              ? <button onClick={() => setPlaying(false)} className="rounded-xl border border-[var(--line)] bg-[var(--raise)] px-5 py-2.5 font-semibold">Pause</button>
-              : <button onClick={launch} className="rounded-xl bg-[var(--flow)] px-5 py-2.5 font-semibold text-[var(--ink)] hover:brightness-110">{t > 0 && t < result.duration ? "Resume" : verb}</button>}
-            <button onClick={reset} className="rounded-xl border border-[var(--line)] bg-[var(--raise)] px-4 py-2.5 text-sm">Reset</button>
-            <div role="group" aria-label="Playback speed" className="ml-auto flex rounded-lg border border-[var(--line)] p-0.5">
+              ? <button onClick={() => setPlaying(false)} className="btn-ghost rounded-full px-5 py-2.5 font-semibold">Pause</button>
+              : <button onClick={launch} className="btn-primary rounded-full px-6 py-2.5">{t > 0 && t < result.duration ? "Resume" : verb}</button>}
+            <button onClick={reset} className="btn-ghost rounded-full px-4 py-2.5 text-sm">Reset</button>
+            <div role="group" aria-label="Playback speed" className="hairline ml-auto flex rounded-full p-0.5">
               {RATES.map(r => (
                 <button key={r} onClick={() => setRate(r)} aria-pressed={rate === r}
-                  className={`rounded-md px-2.5 py-1 font-mono text-xs ${rate === r ? "bg-[var(--raise)] text-[var(--fg)]" : "text-[var(--muted)]"}`}>{r}×</button>
+                  className={`rounded-full px-2.5 py-1 font-mono text-xs ${rate === r ? "bg-white/10 text-[var(--fg)]" : "text-[var(--muted)]"}`}>{r}×</button>
               ))}
             </div>
           </div>
@@ -156,7 +150,7 @@ export default function MotionLab({ initial, embedded = false, onSetupChange }: 
         <aside className="flex flex-col gap-4">
           <Controls scene={scene} setup={setup} body={body} onChange={change} onBody={pickBody} />
           <Readouts result={result} cur={cur} ran={ran} />
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+          <div className="glass rounded-[28px] p-4">
             <h2 className="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--muted)]">What&apos;s happening</h2>
             {result.diagnostics.length ? (
               <ul className="flex flex-col gap-2">
@@ -228,7 +222,7 @@ function ProjectileView({ result, cur, trails, showFull, body }: { result: Motio
       {/* earlier runs, then this run */}
       {trails.map((tr, i) => <path key={i} d={path(tr.pts)} fill="none" stroke="#9C8CFF" strokeOpacity={0.25 + 0.15 * i} strokeWidth={2} strokeDasharray="4 5" />)}
       {showFull && <path d={path(result.samples.map(p => [p.x, p.y]))} fill="none" stroke="var(--volt)" strokeOpacity={0.35} strokeWidth={2} />}
-      <path d={path(upto.map(p => [p.x, p.y]))} fill="none" stroke="var(--volt)" strokeWidth={2.5} />
+      <path d={path(upto.map(p => [p.x, p.y]))} fill="none" stroke="var(--volt)" strokeWidth={2.8} strokeLinecap="round" style={{ filter: "drop-shadow(0 0 6px rgba(255,181,71,0.8))" }} />
       {/* velocity arrow */}
       {cur.speed > 0.05 && cur.y > 0 && (
         <g stroke="var(--flow)" strokeWidth={2.5} strokeLinecap="round">
@@ -329,12 +323,12 @@ function Graph({ result, t, kind, onKind }: { result: MotionResult; t: number; k
   const gy = (v: number) => gm.t + (1 - (v - lo) / (hi - lo)) * (GH - gm.t - gm.b);
   const ys = niceStep(hi - lo, 4), ts = niceStep(T, 6);
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+    <div className="glass rounded-[28px] p-3">
       <div className="mb-1 flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="Graph" className="flex rounded-lg border border-[var(--line)] p-0.5">
+        <div role="group" aria-label="Graph" className="hairline flex rounded-full p-0.5">
           {(["height", "speed", "energy"] as const).map(k => (
             <button key={k} onClick={() => onKind(k)} aria-pressed={kind === k}
-              className={`rounded-md px-3 py-1 text-sm ${kind === k ? "bg-[var(--raise)] text-[var(--fg)]" : "text-[var(--muted)]"}`}>
+              className={`rounded-full px-3.5 py-1.5 text-sm ${kind === k ? "bg-white/10 text-[var(--fg)]" : "text-[var(--muted)]"}`}>
               {k === "height" ? (ramp ? "Position" : "Height") : k === "speed" ? (ramp ? "Velocity" : "Speed") : "Energy"}
             </button>
           ))}
@@ -354,7 +348,7 @@ function Graph({ result, t, kind, onKind }: { result: MotionResult; t: number; k
         {series.map(se => {
           const d = result.samples.map((s, i) => `${i ? "L" : "M"}${gx(s.t).toFixed(1)} ${gy(se.get(s)).toFixed(1)}`).join("");
           const done = result.samples.filter(s => s.t <= t).map((s, i) => `${i ? "L" : "M"}${gx(s.t).toFixed(1)} ${gy(se.get(s)).toFixed(1)}`).join("");
-          return <g key={se.key}><path d={d} fill="none" stroke={se.color} strokeOpacity={0.22} strokeWidth={2} /><path d={done} fill="none" stroke={se.color} strokeWidth={2.2} /></g>;
+          return <g key={se.key}><path d={d} fill="none" stroke={se.color} strokeOpacity={0.22} strokeWidth={2} /><path d={done} fill="none" stroke={se.color} strokeWidth={2.6} strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${se.color})` }} /></g>;
         })}
         <line x1={gx(t)} x2={gx(t)} y1={gm.t} y2={GH - gm.b} stroke="var(--fg)" strokeOpacity={0.5} strokeDasharray="3 3" />
       </svg>
@@ -380,14 +374,14 @@ function Slider({ id, def, value, disabled, onChange }: { id: string; def: Param
 function Controls({ scene, setup, body, onChange, onBody }: { scene: MotionScene; setup: MotionSetup; body?: BodyKind; onChange: (p: Partial<MotionSetup>) => void; onBody: (b: BodyKind) => void }) {
   const ed = (p: MotionParam) => canEdit(scene, p);
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+    <div className="flex flex-col gap-4 glass rounded-[28px] p-4">
       <h2 className="text-lg font-semibold">{setup.kind === "projectile" ? "Launch settings" : "Slope settings"}</h2>
       {setup.kind === "projectile" ? (
         <>
           <div className={`flex flex-col gap-1 ${ed("body") ? "" : "opacity-50"}`}>
             <label htmlFor="body" className="text-sm">Object</label>
             <select id="body" value={body ?? ""} disabled={!ed("body")} onChange={e => onBody(e.target.value as BodyKind)}
-              className="rounded-lg border border-[var(--line)] bg-[var(--raise)] px-3 py-2 text-sm">
+              className="rounded-xl border border-[var(--line)] bg-black/30 px-3 py-2 text-sm">
               {!body && <option value="">Custom</option>}
               {(Object.keys(BODIES) as BodyKind[]).map(b => <option key={b} value={b}>{BODIES[b].label} ({BODIES[b].mass} kg)</option>)}
             </select>
@@ -407,7 +401,7 @@ function Controls({ scene, setup, body, onChange, onBody }: { scene: MotionScene
       <div className={`flex flex-col gap-1 ${ed("planet") ? "" : "opacity-50"}`}>
         <label htmlFor="planet" className="text-sm">Planet</label>
         <select id="planet" value={setup.planet} disabled={!ed("planet")} onChange={e => onChange({ planet: e.target.value as Planet })}
-          className="rounded-lg border border-[var(--line)] bg-[var(--raise)] px-3 py-2 text-sm">
+          className="rounded-xl border border-[var(--line)] bg-black/30 px-3 py-2 text-sm">
           {(Object.keys(PLANETS) as Planet[]).map(p => <option key={p} value={p}>{PLANETS[p]}</option>)}
         </select>
       </div>
@@ -429,7 +423,7 @@ function Readouts({ result, cur, ran }: { result: MotionResult; cur: Sample; ran
   const sm = result.summary;
   const endings = { top: "Reached the top", bottom: "Reached the bottom", stopped: "Came to a stop", held: "Held still by friction" };
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+    <div className="flex flex-col gap-2 glass rounded-[28px] p-4">
       <h2 className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--muted)]">Live readings</h2>
       <Row label="Time" value={fmt(cur.t, "s", 2)} />
       {ramp ? <Row label="Position up the slope" value={fmt(cur.x, "m", 2)} color="var(--volt)" />
