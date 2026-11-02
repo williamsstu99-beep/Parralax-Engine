@@ -60,3 +60,10 @@ export const approach = (cur: number, target: number, rate: number, dt: number) 
 export function rng(seed: number) {
   return () => { seed = (Math.imul(seed, 1664525) + 1013904223) | 0; return (seed >>> 0) / 4294967296; };
 }
+
+/** A canvas font string using the page's own typeface (canvas can't read CSS variables). */
+let family = "";
+export function font(weight: number, px: number) {
+  if (!family && typeof document !== "undefined") family = getComputedStyle(document.body).fontFamily || "system-ui, sans-serif";
+  return `${weight} ${px}px ${family || "system-ui, sans-serif"}`;
+}

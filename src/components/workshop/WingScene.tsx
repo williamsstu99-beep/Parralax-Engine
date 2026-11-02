@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import SceneShell from "./SceneShell";
 import { Slider, Toggle } from "./controls";
-import { approach, rng, useCanvas } from "./useCanvas";
+import { approach, font, rng, useCanvas } from "./useCanvas";
 import { aerofoil, liftFactor, stallAmount, velocity } from "./wingFlow";
 
 type V = [number, number];
@@ -162,14 +162,14 @@ export default function WingScene() {
         ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 4; ctx.shadowColor = color; ctx.shadowBlur = 14;
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y2 + dir * 10); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(x, y2); ctx.lineTo(x - 9, y2 + dir * 14); ctx.lineTo(x + 9, y2 + dir * 14); ctx.closePath(); ctx.fill();
-        ctx.shadowBlur = 0; ctx.font = "600 13px var(--font-geist-sans), system-ui"; ctx.textAlign = "left";
+        ctx.shadowBlur = 0; ctx.font = font(600, 15); ctx.textAlign = "left";
         ctx.fillText(label, x + 14, y2 + dir * 6);
         ctx.restore();
       };
       arrow(wingC.x, wingC.y - s * 0.25, Math.min(s * 2.2, S.lift * s * 0.42), "#5eead4", "Lift");
       arrow(wingC.x + s * 0.5, wingC.y + s * 0.2, -WEIGHT * s * 0.42, "#ff9db0", "Weight");
       if (showP && U > 0.25 && stall < 0.5) {
-        ctx.font = "500 12px var(--font-geist-sans), system-ui"; ctx.textAlign = "center";
+        ctx.font = font(500, 14); ctx.textAlign = "center";
         ctx.fillStyle = "rgba(170, 185, 255, 0.85)"; ctx.fillText("lower pressure", wingC.x - s * 1.2, wingC.y - s * 1.15);
         ctx.fillStyle = "rgba(255, 195, 120, 0.85)"; ctx.fillText("higher pressure", wingC.x - s * 1.0, wingC.y + s * 1.05);
       }
