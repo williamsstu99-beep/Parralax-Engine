@@ -108,7 +108,7 @@ function Progress({ started }: { started: number }) {
   const [now, setNow] = useState(started);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, []);
   const secs = Math.round((now - started) / 1000);
-  const idx = Math.min(STEPS.length - 1, Math.floor(secs / 8));
+  const idx = Math.min(STEPS.length - 1, Math.floor(secs / 20));
   return (
     <div aria-live="polite" className="flex flex-col gap-3 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5">
       <div className="flex items-center gap-3">
@@ -117,9 +117,9 @@ function Progress({ started }: { started: number }) {
         <span className="ml-auto font-mono text-sm text-[var(--muted)]">{secs}s</span>
       </div>
       <div className="h-1 overflow-hidden rounded-full bg-[var(--raise)]">
-        <div className="h-full rounded-full bg-gradient-to-r from-[var(--flow)] to-[var(--volt)] transition-all duration-500" style={{ width: `${Math.min(95, secs * 1.6)}%` }} />
+        <div className="h-full rounded-full bg-gradient-to-r from-[var(--flow)] to-[var(--volt)] transition-all duration-500" style={{ width: `${Math.min(95, secs * 0.6)}%` }} />
       </div>
-      <p className="text-sm text-[var(--muted)]">Usually 30–90 seconds. If a circuit fails the solver&apos;s checks, it&apos;s sent back to be fixed automatically.</p>
+      <p className="text-sm text-[var(--muted)]">Usually 1–3 minutes: the simulation is built for your request, then run and checked against real-world facts. Anything that fails is sent back to be fixed automatically.</p>
     </div>
   );
 }

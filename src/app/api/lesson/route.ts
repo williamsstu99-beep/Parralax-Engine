@@ -12,6 +12,8 @@ export const maxDuration = 300;
 
 const MODEL = "claude-opus-5-5";
 const MAX_ATTEMPTS = 3;
+// Don't start a repair attempt this late: one attempt can take ~90 s and the function stops at maxDuration (300 s).
+const LAST_START_MS = 180_000;
 
 // The general model format is too large for strict structured output, so for
 // model lessons the AI writes plain JSON against this schema and the engine's
@@ -45,11 +47,13 @@ export async function POST(req: Request) {
   let lastErrors: string[] = [];
 
   try {
+    const started = Date.now();
     const engine = await chooseEngine(client, request);
     const content = strict(engine) ? lessonRequest(request, engine)
       : `${lessonRequest(request, engine)}\n\nReply with a single JSON object and nothing else, matching this JSON Schema:\n${MODEL_SCHEMA}`;
     const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content }];
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      if (attempt > 1 && Date.now() - started > LAST_START_MS) break;
       const stream = client.beta.messages.stream({
         model: MODEL,
         max_tokens: 64000,

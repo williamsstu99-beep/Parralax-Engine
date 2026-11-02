@@ -16,10 +16,12 @@ interface Msg { role: "user" | "assistant"; content: string; error?: boolean }
 const STARTERS = ["I'm stuck. Can I have a hint?", "Why did that happen?", "Can you explain this another way?"];
 const MAX_SENT = 40; // matches the route's limit
 
-/** **bold** is the only formatting the tutor uses; render that and keep line breaks. */
+/** The tutor uses **bold** and *italics* at most; render those and keep line breaks. */
 function Rich({ text }: { text: string }) {
-  return <>{text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.startsWith("**") && part.endsWith("**") ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong> : <Fragment key={i}>{part}</Fragment>)}</>;
+  return <>{text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
+      : part.length > 2 && part.startsWith("*") && part.endsWith("*") ? <em key={i}>{part.slice(1, -1)}</em>
+      : <Fragment key={i}>{part}</Fragment>)}</>;
 }
 
 export default function TutorPanel({ lesson, sceneIdx, getSim }: { lesson: Lesson; sceneIdx: number; getSim: () => Sim }) {
