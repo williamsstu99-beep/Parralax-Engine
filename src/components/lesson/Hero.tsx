@@ -41,9 +41,11 @@ function useTypewriter(paused: boolean) {
   return { text, full: IDEAS[idea] };
 }
 
-export default function Hero({ value, onChange, onSubmit, busy, error }: {
+export default function Hero({ value, onChange, onSubmit, busy, error, needsCode = false, onUnlock }: {
   value: string; onChange: (v: string) => void; onSubmit: () => void; busy: boolean;
   error?: { message: string; details?: string[] };
+  /** The request needs the access code first: show a small code field under the prompt. */
+  needsCode?: boolean; onUnlock?: (code: string) => Promise<string | null>;
 }) {
   const ghost = useTypewriter(value.length > 0 || busy);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -88,6 +90,8 @@ export default function Hero({ value, onChange, onSubmit, busy, error }: {
         </p>
       </form>
 
+      {needsCode && onUnlock && <CodeField onUnlock={onUnlock} />}
+
       {error && (
         <div role="alert" className="anim-rise mt-6 w-full rounded-2xl border border-[var(--bad)]/40 bg-[rgba(255,122,133,0.07)] px-4 py-3 text-left text-sm">
           <p className="font-medium">{error.message}</p>
@@ -104,5 +108,31 @@ export default function Hero({ value, onChange, onSubmit, busy, error }: {
         </nav>
       </div>
     </div>
+  );
+}
+
+/** One-time access code, asked for only when a request needs it. The browser remembers it after that. */
+function CodeField({ onUnlock }: { onUnlock: (code: string) => Promise<string | null> }) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <form className="anim-rise mt-6 flex w-full max-w-sm flex-col items-center gap-2"
+      onSubmit={async e => {
+        e.preventDefault();
+        if (!code.trim() || busy) return;
+        setBusy(true); setError("");
+        const err = await onUnlock(code.trim());
+        if (err) { setError(err); setCode(""); setBusy(false); }
+      }}>
+      <label htmlFor="access-code" className="text-sm text-[var(--muted)]">Enter your school&apos;s code to build it</label>
+      <div className="glass flex w-full items-center gap-2 rounded-2xl p-1.5 pl-4">
+        <input id="access-code" value={code} onChange={e => { setCode(e.target.value); setError(""); }} autoFocus inputMode="numeric" autoComplete="off" maxLength={32} disabled={busy}
+          aria-invalid={!!error} aria-describedby={error ? "access-error" : undefined}
+          className="min-w-0 flex-1 bg-transparent py-2 font-mono text-lg tracking-[0.3em] outline-none disabled:opacity-60" placeholder="····" />
+        <button type="submit" disabled={busy || !code.trim()} className="btn-primary rounded-xl px-4 py-2 text-sm">{busy ? "Checking…" : "Go"}</button>
+      </div>
+      <p id="access-error" role="alert" className="min-h-5 text-sm text-[var(--bad)]">{error}</p>
+    </form>
   );
 }

@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import CodeForm from "./CodeForm";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Enter code · Dynamic Learning" };
-
+/** The code is now asked for in the prompt box itself; old links land there. */
 export default function EnterCode() {
-  return <CodeForm />;
+  redirect("/");
 }

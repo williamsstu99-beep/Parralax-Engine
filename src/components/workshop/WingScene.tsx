@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import SceneShell from "./SceneShell";
 import { Slider, Toggle } from "./controls";
-import { approach, font, rng, useCanvas } from "./useCanvas";
+import { approach, arrow, font, rng, useCanvas } from "./useCanvas";
 import { aerofoil, liftFactor, stallAmount, velocity } from "./wingFlow";
 
 type V = [number, number];
@@ -149,25 +149,15 @@ export default function WingScene() {
       ctx.fillStyle = g; ctx.fill();
       ctx.globalAlpha = 1;
     }
-    ctx.shadowColor = "rgba(110, 231, 255, 0.9)"; ctx.shadowBlur = 16;
-    ctx.strokeStyle = "rgba(160, 240, 255, 0.95)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.shadowColor = "rgba(110, 231, 255, 0.5)"; ctx.shadowBlur = 5;
+    ctx.strokeStyle = "rgba(175, 238, 255, 0.95)"; ctx.lineWidth = 1.6; ctx.stroke();
     ctx.restore();
 
     // Forces: lift up, weight down. Lift bigger than weight → the wing rises.
     if (time > 1.4) {
-      const arrow = (x: number, y: number, len: number, color: string, label: string) => {
-        if (Math.abs(len) < 4) return;
-        const dir = Math.sign(len), y2 = y - len;
-        ctx.save();
-        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 4; ctx.shadowColor = color; ctx.shadowBlur = 14;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y2 + dir * 10); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x, y2); ctx.lineTo(x - 9, y2 + dir * 14); ctx.lineTo(x + 9, y2 + dir * 14); ctx.closePath(); ctx.fill();
-        ctx.shadowBlur = 0; ctx.font = font(600, 15); ctx.textAlign = "left";
-        ctx.fillText(label, x + 14, y2 + dir * 6);
-        ctx.restore();
-      };
-      arrow(wingC.x, wingC.y - s * 0.25, Math.min(s * 2.2, S.lift * s * 0.42), "#5eead4", "Lift");
-      arrow(wingC.x + s * 0.5, wingC.y + s * 0.2, -WEIGHT * s * 0.42, "#ff9db0", "Weight");
+      const lift = Math.min(s * 2.2, S.lift * s * 0.42), weight = WEIGHT * s * 0.42;
+      if (lift > 4) arrow(ctx, wingC.x, wingC.y - s * 0.25, wingC.x, wingC.y - s * 0.25 - lift, "#7dd3c0", "Lift");
+      arrow(ctx, wingC.x + s * 0.5, wingC.y + s * 0.2, wingC.x + s * 0.5, wingC.y + s * 0.2 + weight, "#f0a3b4", "Weight");
       if (showP && U > 0.25 && stall < 0.5) {
         ctx.font = font(500, 14); ctx.textAlign = "center";
         ctx.fillStyle = "rgba(170, 185, 255, 0.85)"; ctx.fillText("lower pressure", wingC.x - s * 1.2, wingC.y - s * 1.15);
