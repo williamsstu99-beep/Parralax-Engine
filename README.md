@@ -16,7 +16,7 @@ Students and teachers ask for a concept, any concept in biology, chemistry or ph
 - [x] Interactive circuit workspace (`/lab/circuits`): drag-and-drop parts, wiring, live current flow, diagnostics, LED challenge, capacitor transients
 - [x] Lesson Spec + AI generation (`/lesson`, `src/engine/spec`): the AI writes a structured lesson; the engine validates every circuit with the solver and sends errors back for automatic repair
 - [x] AI tutor, text (`/api/tutor`, `src/engine/tutor`): a chat panel in every lesson. The server solves the student's current board with the Truth solver and gives the tutor those readings, so it only quotes real numbers. Readings go in as system messages, so a student can't fake them by typing.
-- [ ] AI tutor, voice
+- [x] AI tutor, voice: tap the mic and talk (words appear as you speak and send when you stop), and a speaker toggle reads replies aloud. Uses the browser's built-in speech (free; NZ English); browsers without speech recognition (Firefox) just keep typing.
 - [x] Motion Truth solver (`src/engine/truth/motion`): exact projectiles and ramps, RK4 air resistance, energy tracking, 14 tests
 - [x] Motion lab (`/lab/motion`): projectiles with trails, ramps with free-body force arrows, live height/speed/energy graphs, challenges
 - [x] Motion lessons: the generator picks the engine (circuits, motion or populations) and the validator runs the solver, rejecting challenges that are already solved or that no allowed setting can solve
@@ -24,7 +24,7 @@ Students and teachers ask for a concept, any concept in biology, chemistry or ph
 - [x] Populations lab (`/lab/populations`): habitat view, dual-axis graph with control shading, prey-vs-predator cycle plot, challenges
 - [x] Populations lessons: generated, solver-validated and tutored like the other engines
 - [x] General model engine (`src/engine/truth/model`, `src/engine/spec/model.ts`, `/lesson`): for any concept the AI writes a model and the real-world facts and cause-and-effect it must reproduce; the engine runs it across every setting's range, checks the facts, conserved totals and challenges, and sends failures back for repair. The model lab draws any model (diagram with animated flows, particles, gauges, graphs) and shows what it was checked against. Tested live on blood glucose, reaction rates, cooling, nerve impulses and vaccines.
-- [ ] Faster generation (model lessons take 1-3 minutes)
+- [x] Faster generation: about 1 minute per lesson, with live progress (real stages, word count, and why any repair is happening)
 
 ## Development
 

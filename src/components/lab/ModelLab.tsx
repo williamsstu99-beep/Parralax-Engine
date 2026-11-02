@@ -280,6 +280,8 @@ function Diagram({ model, run, t, frame, colors, units }: { model: ModelSpecDef;
           const nx = -(p1.y - p0.y) / (len || 1), ny = (p1.x - p0.x) / (len || 1), side = ny > 0 ? -1 : 1;
           const mid = { x: (p0.x + p1.x) / 2 + nx * 10 * side, y: (p0.y + p1.y) / 2 + ny * 10 * side };
           const opp = { x: (p0.x + p1.x) / 2 - nx * 20 * side, y: (p0.y + p1.y) / 2 - ny * 20 * side + 4 };
+          // On steep lines, put text beside the line rather than centred over it.
+          const steep = Math.abs(nx) > 0.6, anchor = (dx: number) => (!steep ? "middle" : dx > 0 ? "start" : "end");
           return (
             <g key={f.id}>
               {cloud0 && <circle cx={p0.x} cy={p0.y} r={12} fill="none" stroke="#3A4868" strokeDasharray="3 3" />}
@@ -290,8 +292,8 @@ function Diagram({ model, run, t, frame, colors, units }: { model: ModelSpecDef;
                 return <circle key={i} cx={p0.x + (p1.x - p0.x) * u} cy={p0.y + (p1.y - p0.y) * u} r={3 + 2 * mag} fill={color} opacity={0.9} />;
               })}
               <title>{`${f.label}: ${num(r)} ${units[f.id]}`}</title>
-              <text x={mid.x} y={mid.y - 8} textAnchor="middle" className="text-[11px]" fill={color} stroke="#0a0f1c" strokeWidth={3} paintOrder="stroke">{f.label.length > 20 ? `${f.label.slice(0, 19)}…` : f.label}</text>
-              {!crowded && <text x={opp.x} y={opp.y} textAnchor="middle" className="fill-[var(--muted)] font-mono text-[10px]" stroke="#0a0f1c" strokeWidth={3} paintOrder="stroke">{num(r)} {units[f.id]}</text>}
+              <text x={mid.x} y={steep ? mid.y + 4 : mid.y - 8} textAnchor={anchor(mid.x - (p0.x + p1.x) / 2)} className="text-[11px]" fill={color} stroke="#0a0f1c" strokeWidth={3} paintOrder="stroke">{f.label.length > 20 ? `${f.label.slice(0, 19)}…` : f.label}</text>
+              {!crowded && <text x={opp.x} y={opp.y} textAnchor={anchor(opp.x - (p0.x + p1.x) / 2)} className="fill-[var(--muted)] font-mono text-[10px]" stroke="#0a0f1c" strokeWidth={3} paintOrder="stroke">{num(r)} {units[f.id]}</text>}
             </g>
           );
         })}
