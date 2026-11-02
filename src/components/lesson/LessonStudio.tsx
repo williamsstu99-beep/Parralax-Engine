@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Mark, Wordmark } from "@/components/brand/Mark";
 import Field from "@/components/brand/Field";
 import Hero from "@/components/lesson/Hero";
@@ -23,16 +23,28 @@ export default function LessonStudio() {
   const [request, setRequest] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const router = useRouter();
+  // Whether this browser still needs the access code (null until we know).
+  const [locked, setLocked] = useState<boolean | null>(null);
+  useEffect(() => {
+    fetch("/api/access", { cache: "no-store" }).then(r => r.json()).then((d: { ok?: boolean }) => setLocked(!d.ok)).catch(() => setLocked(null));
+  }, []);
 
-  async function generate(text: string) {
+  function generate(text: string) {
     if (!text.trim() || status.kind === "loading") return;
+    // Ask for the code straight away rather than flashing the build screen first.
+    if (locked) { setStatus({ kind: "idle", needsCode: true }); return; }
+    void generateUnlocked(text);
+  }
+
+  async function generateUnlocked(text: string) {
+    if (!text.trim()) return;
     const fail = (message: string, details?: string[]) => setStatus({ kind: "idle", error: { message, details } });
     setStatus({ kind: "loading", started: Date.now(), request: text.trim(), fixes: [] });
     try {
       // First: is this one of the hand-crafted simulations? If so, go straight there.
       const pick = await fetch("/api/scene", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) })
         .then(r => (r.status === 401 ? { scene: "locked" } : r.ok ? r.json() : { scene: "other" })).catch(() => ({ scene: "other" })) as { scene: string };
-      if (pick.scene === "locked") { setStatus({ kind: "idle", needsCode: true }); return; }
+      if (pick.scene === "locked") { setLocked(true); setStatus({ kind: "idle", needsCode: true }); return; }
       if (pick.scene !== "other") {
         setStatus(st => st.kind === "loading" ? { ...st, stage: { t: "stage", stage: "writing", label: "Building your simulation" } } : st);
         await new Promise(r => setTimeout(r, 1400)); // let the build animation play for a beat
@@ -40,7 +52,7 @@ export default function LessonStudio() {
         return;
       }
       const res = await fetch("/api/lesson", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) });
-      if (res.status === 401) { setStatus({ kind: "idle", needsCode: true }); return; }
+      if (res.status === 401) { setLocked(true); setStatus({ kind: "idle", needsCode: true }); return; }
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
         fail(data.error ?? "Something went wrong.", data.details);
@@ -75,8 +87,8 @@ export default function LessonStudio() {
       const res = await fetch("/api/access", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code }) });
       if (!res.ok) return ((await res.json().catch(() => ({}))) as { error?: string }).error ?? "That code isn't right.";
     } catch { return "Couldn't check the code. Check your connection and try again."; }
-    setStatus({ kind: "idle" });
-    void generate(request);
+    setLocked(false);
+    void generateUnlocked(request);
     return null;
   }
 
