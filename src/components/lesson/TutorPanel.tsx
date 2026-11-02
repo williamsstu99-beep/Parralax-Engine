@@ -9,7 +9,7 @@ import type { Lesson } from "@/engine/spec/lesson";
 import type { TutorEvent } from "@/engine/tutor/prompt";
 
 /** What the student has in front of them: a circuit board, motion settings or population settings. */
-export interface Sim { board?: Board; motion?: MotionSetup; population?: PopulationSetup }
+export interface Sim { board?: Board; motion?: MotionSetup; population?: PopulationSetup; values?: Record<string, number> }
 
 interface Msg { role: "user" | "assistant"; content: string; error?: boolean }
 

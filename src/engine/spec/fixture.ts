@@ -236,3 +236,86 @@ export const POP_EXAMPLE: Lesson = {
   ],
   teacher_notes: "The model is simplified: real stoats eat many prey species (rabbits, rats, birds), so they don't depend on one prey. Link to Predator Free 2050 and local trapping groups. Misconception: one big trapping effort fixes the problem; ask students to stop trapping after year 30 in the free lab and watch what happens.",
 };
+
+/**
+ * A hand-checked general-model lesson (Newton's law of cooling): the worked
+ * example for model generation, and a test fixture.
+ */
+export const MODEL_EXAMPLE: Lesson = {
+  engine: "model",
+  model: {
+    time_unit: "minutes",
+    duration: 60,
+    settings: [
+      { id: "start_temp", label: "Starting temperature", unit: "°C", min: 40, max: 100, value: 90, step: 1 },
+      { id: "room", label: "Room temperature", unit: "°C", min: 0, max: 35, value: 20, step: 1 },
+      { id: "lid", label: "Lid on (1) or off (0)", unit: "", min: 0, max: 1, value: 0, step: 1 },
+      { id: "k", label: "How quickly heat escapes", unit: "per min", min: 0.01, max: 0.1, value: 0.04, step: 0.005 },
+    ],
+    stocks: [{ id: "temp", label: "Tea temperature", unit: "°C", initial: "start_temp", min: null, max: 100, x: 35, y: 50 }],
+    flows: [{ id: "heat_loss", label: "Cooling", from: "temp", to: null, rate: "k * (1 - 0.5 * lid) * (temp - room)" }],
+    variables: [{ id: "gap", label: "Hotter than the room by", unit: "°C", expr: "temp - room" }],
+    facts: [
+      { claim: "A cup of tea left in a 20 °C room is close to room temperature after an hour", what: "temp", stat: "final", at: null, min: 20, max: 30, settings: [] },
+      { claim: "Fresh tea is still hot (60-90 °C) five minutes after it's poured", what: "temp", stat: "at", at: 5, min: 60, max: 90, settings: [] },
+    ],
+    comparisons: [
+      { claim: "A lid keeps tea hotter for longer", what: "temp", stat: "at", at: 20, low: [{ id: "lid", value: 0 }], high: [{ id: "lid", value: 1 }] },
+      { claim: "Hotter tea loses heat faster", what: "heat_loss", stat: "max", at: null, low: [{ id: "start_temp", value: 60 }], high: [{ id: "start_temp", value: 100 }] },
+    ],
+    conserved: [],
+    gauges: [{ what: "temp", label: "Tea", min: 0, max: 100 }],
+    particles: null,
+    simplifications: "Treats the tea as one temperature throughout and ignores evaporation, the cup heating up, and milk. Real cooling is a little faster at first because of evaporation.",
+  },
+  title: "Why does tea cool fast, then slowly?",
+  year_level: 10,
+  objective: "Explain that the rate of cooling depends on the temperature difference, and how insulation slows heat loss.",
+  key_ideas: [
+    "Heat flows from hotter to colder places.",
+    "The bigger the temperature difference, the faster the heat flows, so cooling slows down as the tea nears room temperature.",
+    "A lid reduces heat loss, so the tea stays hot for longer.",
+  ],
+  scenes: [
+    {
+      heading: "Watch it cool",
+      intro: "A fresh cup of tea sits on the bench. Predict the shape of the temperature graph, then run it.",
+      setup: { values: [], editable: ["room"], graph: ["temp", "heat_loss"], challenge: null },
+      explain: {
+        simple: "Hot tea is like a full water tank with a leak: when it's very full, water rushes out; as it empties, the flow slows to a trickle.",
+        intermediate: "Heat transfers from the tea to the cooler room. The rate of transfer depends on the temperature difference, so the tea cools quickly at first and more slowly as it approaches room temperature.",
+        advanced: "Newton's law of cooling: dT/dt = −k(T − T_room), giving T = T_room + (T₀ − T_room)e^(−kt). The difference halves every ln 2 / k minutes.",
+      },
+      try_this: ["Make the room colder. Does the tea cool faster at the start?", "Watch the cooling graph: when is it steepest?"],
+    },
+    {
+      heading: "Keep it hot",
+      intro: "You want your tea still above 55 °C after 20 minutes. Find a way.",
+      setup: {
+        values: [], editable: ["lid", "start_temp"], graph: ["temp"],
+        challenge: { title: "Hot after 20", goal: "Keep the tea at 55 °C or more at 20 minutes.", checks: [{ what: "temp", stat: "at", at: 20, min: 55, max: null }], hint_if_stuck: "What do people put on a takeaway cup?", success: "Still toasty!" },
+      },
+      explain: {
+        simple: "A lid is like a blanket for your tea: it traps the heat inside.",
+        intermediate: "A lid reduces heat loss by evaporation and convection from the surface, which lowers the rate of heat transfer.",
+        advanced: "The lid halves the effective cooling constant k, doubling the time constant 1/k.",
+      },
+      try_this: ["Compare starting at 100 °C with no lid against starting at 80 °C with a lid."],
+    },
+  ],
+  questions: [
+    {
+      question: "When does a cup of tea cool fastest?",
+      choices: ["Right after it's poured", "Halfway through", "When it's nearly at room temperature", "It cools at the same rate the whole time"],
+      answer_index: 0,
+      explanation: "Heat flows fastest when the temperature difference is biggest.",
+    },
+    {
+      question: "Why does a lid keep tea hot for longer?",
+      choices: ["It adds heat", "It reduces heat loss from the surface", "It makes the tea heavier", "It cools the room"],
+      answer_index: 1,
+      explanation: "Less heat escapes by evaporation and convection when the surface is covered.",
+    },
+  ],
+  teacher_notes: "Misconception: 'cold gets in'. Emphasise heat flowing out. Extension: ask students to predict the effect of adding cold milk early versus late.",
+};

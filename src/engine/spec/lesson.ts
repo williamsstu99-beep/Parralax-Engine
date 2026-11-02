@@ -107,6 +107,73 @@ export const PopulationSpec = z.object({
   }).nullable().describe("A challenge, or null for a demo scene"),
 });
 
+/* ---------------- general models (any concept) ---------------- */
+
+const Assign = z.object({ id: z.string().describe("A setting id"), value: z.number() });
+const STATS = ["final", "max", "min", "mean", "at", "time_of_max", "time_of_min"] as const;
+
+/**
+ * A model the AI writes for any concept: stocks (amounts that build up or
+ * drain), flows that move amounts between them, variables, settings, and the
+ * real-world facts the engine checks it against. Every field is required
+ * (null or [] where unused) to keep the structured-output grammar small.
+ */
+export const ModelSpec = z.object({
+  time_unit: z.enum(["seconds", "minutes", "hours", "days", "years"]),
+  duration: z.number().describe("How long one run lasts, in time_unit"),
+  settings: z.array(z.object({
+    id: z.string(), label: z.string(), unit: z.string(),
+    min: z.number(), max: z.number(), value: z.number().describe("Default"), step: z.number().describe("Slider step"),
+  })).describe("Inputs the student can change"),
+  stocks: z.array(z.object({
+    id: z.string(), label: z.string(), unit: z.string(),
+    initial: z.string().describe("Starting amount: a number or an expression of settings"),
+    min: z.number().nullable().describe("Lowest possible value, e.g. 0 for amounts; null for none"),
+    max: z.number().nullable().describe("Highest physically sensible value; the engine rejects runs that exceed it. null for none"),
+    x: z.number().nullable().describe("Diagram position, 0-100 left to right; null to leave off the diagram"),
+    y: z.number().nullable().describe("Diagram position, 0-100 top to bottom; null to leave off the diagram"),
+  })).describe("Amounts that build up or drain over time"),
+  flows: z.array(z.object({
+    id: z.string(), label: z.string(),
+    from: z.string().nullable().describe("Stock it drains, or null for 'from outside'"),
+    to: z.string().nullable().describe("Stock it fills, or null for 'to outside'"),
+    rate: z.string().describe("Amount per time_unit, as an expression"),
+  })).describe("Each stock changes by its inflows minus its outflows"),
+  variables: z.array(z.object({ id: z.string(), label: z.string(), unit: z.string(), expr: z.string() })).describe("Helper quantities computed from stocks and settings"),
+  facts: z.array(z.object({
+    claim: z.string().describe("The real-world fact, in words"),
+    what: z.string().describe("Stock, flow or variable id"),
+    stat: z.enum(STATS), at: z.number().nullable().describe("Time for stat 'at'; otherwise null"),
+    min: z.number().nullable(), max: z.number().nullable(),
+    settings: z.array(Assign).describe("Settings to use for this check ([] for defaults)"),
+  })).describe("Known real-world values the model must reproduce. At least 2."),
+  comparisons: z.array(z.object({
+    claim: z.string(), what: z.string(), stat: z.enum(STATS), at: z.number().nullable(),
+    low: z.array(Assign).describe("Settings for the run that should give the smaller value"),
+    high: z.array(Assign).describe("Settings for the run that should give the larger value"),
+  })).describe("Cause-and-effect the model must show, e.g. hotter → faster"),
+  conserved: z.array(z.string()).describe("Stock ids whose total must stay constant (e.g. atoms, total water); [] if none"),
+  gauges: z.array(z.object({ what: z.string(), label: z.string(), min: z.number(), max: z.number() })).describe("Dials for key quantities"),
+  particles: z.object({
+    species: z.array(z.object({ label: z.string(), what: z.string().describe("Stock or variable that sets how many are shown"), color: z.enum(["blue", "orange", "green", "red", "purple", "yellow"]) })),
+    speed: z.string().nullable().describe("Stock or variable that sets how fast particles move (e.g. temperature); null for steady"),
+  }).nullable().describe("A particle view for molecules, cells or ions; null if it wouldn't help"),
+  simplifications: z.string().describe("What this model leaves out, for the teacher"),
+});
+
+export const ModelSceneSpec = z.object({
+  values: z.array(Assign).describe("Starting values for this scene ([] for defaults)"),
+  editable: z.array(z.string()).describe("Setting ids the student may change in this scene"),
+  graph: z.array(z.string()).describe("1-3 stock, flow or variable ids to plot"),
+  challenge: z.object({
+    title: z.string(),
+    goal: z.string().describe("One sentence telling the student what to achieve"),
+    checks: z.array(z.object({ what: z.string(), stat: z.enum(STATS), at: z.number().nullable(), min: z.number().nullable(), max: z.number().nullable() })).describe("All must pass after a run"),
+    hint_if_stuck: z.string(),
+    success: z.string(),
+  }).nullable(),
+});
+
 export const SceneSpec = z.object({
   heading: z.string(),
   intro: z.string().describe("2-3 sentences to the student before they start"),
@@ -114,6 +181,7 @@ export const SceneSpec = z.object({
   challenge: ChallengeSpec.optional().describe("circuits lessons only"),
   motion: MotionSpec.optional().describe("motion lessons only: the simulation"),
   population: PopulationSpec.optional().describe("populations lessons only: the simulation"),
+  setup: ModelSceneSpec.optional().describe("model lessons only: this scene's settings and challenge"),
   explain: z.object({
     simple: z.string().describe("Everyday analogy, no jargon"),
     intermediate: z.string().describe("Scientific terms appropriate to the year level"),
@@ -130,7 +198,8 @@ export const QuestionSpec = z.object({
 });
 
 export const LessonSpec = z.object({
-  engine: z.enum(["circuits", "motion", "populations"]).describe("Which simulation engine every scene uses"),
+  engine: z.enum(["circuits", "motion", "populations", "model"]).describe("Which simulation engine every scene uses"),
+  model: ModelSpec.optional().describe("model lessons only: the model every scene uses"),
   title: z.string(),
   year_level: z.number().describe("New Zealand year level, 6 to 13"),
   objective: z.string(),
@@ -147,19 +216,25 @@ export type Lesson = z.infer<typeof LessonSpec>;
  * large for structured output, so the route picks the engine first and asks
  * for a lesson in that engine's shape. Results still parse as LessonSpec.
  */
-const SceneCommon = SceneSpec.omit({ board: true, challenge: true, motion: true, population: true });
+const SceneCommon = SceneSpec.omit({ board: true, challenge: true, motion: true, population: true, setup: true });
+const LessonCommon = LessonSpec.omit({ model: true });
 export const LESSON_FORMATS = {
-  circuits: LessonSpec.extend({
+  circuits: LessonCommon.extend({
     engine: z.literal("circuits"),
     scenes: z.array(SceneCommon.extend({ board: SceneSpec.shape.board.unwrap(), challenge: SceneSpec.shape.challenge })).describe("1 to 4 scenes, building up"),
   }),
-  motion: LessonSpec.extend({
+  motion: LessonCommon.extend({
     engine: z.literal("motion"),
     scenes: z.array(SceneCommon.extend({ motion: z.lazy(() => MotionGenSpec) })).describe("1 to 4 scenes, building up"),
   }),
-  populations: LessonSpec.extend({
+  populations: LessonCommon.extend({
     engine: z.literal("populations"),
     scenes: z.array(SceneCommon.extend({ population: PopulationSpec })).describe("1 to 4 scenes, building up"),
+  }),
+  model: LessonCommon.extend({
+    engine: z.literal("model"),
+    model: ModelSpec,
+    scenes: z.array(SceneCommon.extend({ setup: ModelSceneSpec })).describe("1 to 4 scenes, building up"),
   }),
 };
 
@@ -206,10 +281,12 @@ export const MotionGenSpec = z.object({
 export type MotionGen = z.infer<typeof MotionGenSpec>;
 
 /** Schema for the quick first step that picks the engine. */
-export const EngineChoice = z.object({ engine: z.enum(["circuits", "motion", "populations"]) });
+export const EngineChoice = z.object({ engine: z.enum(["circuits", "motion", "model"]) });
 export type Scene = z.infer<typeof SceneSpec>;
 export type ChallengeDef = z.infer<typeof ChallengeSpec>;
 export type Check = z.infer<typeof CheckSpec>;
 export type MotionDef = z.infer<typeof MotionSpec>;
 export type PopulationDef = z.infer<typeof PopulationSpec>;
+export type ModelSpecDef = z.infer<typeof ModelSpec>;
+export type ModelSceneDef = z.infer<typeof ModelSceneSpec>;
 export type Engine = Lesson["engine"];

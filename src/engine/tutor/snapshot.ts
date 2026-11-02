@@ -14,6 +14,9 @@ import { rampForces, solveMotion } from "../truth/motion/solver";
 import { GRAVITY, type MotionSetup, type Planet } from "../truth/motion/types";
 import { solvePopulation, type PopulationSetup } from "../truth/population/solver";
 import { evalPopChallenge, type PopChallenge, type PopNames } from "../lens/population/model";
+import type { ModelSceneDef, ModelSpecDef } from "../spec/lesson";
+import { evalModelChallenge, labelsOf, modelDef } from "../spec/model";
+import { compileModel, runModel, stat } from "../truth/model/solver";
 
 const amps = (a: number) => {
   const x = Math.abs(a);
@@ -150,6 +153,36 @@ export function populationSnapshot(setup: PopulationSetup, names: PopNames, chal
     const res = evalPopChallenge(challenge, r, names);
     challengeDone = res.done;
     lines.push(`Challenge "${challenge.title}" (${challenge.goal}): if they ran these settings now it would ${res.done ? "SUCCEED" : `not succeed yet. Engine feedback: ${res.hint}`} (the student only sees the result after they run it, so don't give the outcome away).`);
+  }
+  return { text: lines.join("\n"), challengeDone };
+}
+
+/* ---------------- general models ---------------- */
+
+const n3 = (v: number) => (Number.isFinite(v) ? (+v.toPrecision(3)).toString() : "not a number");
+
+/** Run the student's current settings through the lesson's model and describe the results for the tutor. */
+export function modelSnapshot(model: ModelSpecDef, values: Record<string, number>, setup: ModelSceneDef): Snapshot {
+  const run = runModel(compileModel(modelDef(model)), values);
+  const labels = labelsOf(model), tu = model.time_unit;
+  const lines: string[] = [];
+  lines.push(`Settings now: ${model.settings.map(s => `${s.label} = ${n3(values[s.id] ?? s.value)}${s.unit ? ` ${s.unit}` : ""}`).join("; ")}.`);
+  if (setup.editable.length) lines.push(`The student can change: ${setup.editable.map(id => labels[id] ?? id).join(", ")}.`);
+  if (!run.ok) lines.push(`With these settings the model can't run: ${run.error}`);
+  else {
+    lines.push(`Solver results over ${n3(model.duration)} ${tu}:`);
+    for (const x of [...model.stocks, ...model.variables]) {
+      lines.push(`- ${x.label}: starts ${n3(stat(run, x.id, "at", 0))}, ends ${n3(stat(run, x.id, "final"))}, highest ${n3(stat(run, x.id, "max"))} (at ${n3(stat(run, x.id, "time_of_max"))} ${tu}), lowest ${n3(stat(run, x.id, "min"))} ${x.unit}`);
+    }
+    for (const f of model.flows) lines.push(`- ${f.label} (rate): starts ${n3(stat(run, f.id, "at", 0))}, peaks ${n3(stat(run, f.id, "max"))} per ${tu.replace(/s$/, "")}`);
+    const marks = [0.25, 0.5, 0.75].map(q => q * model.duration);
+    lines.push(`Snapshots: ${marks.map(m => `at ${n3(m)} ${tu}: ${model.stocks.map(s => `${s.label} ${n3(stat(run, s.id, "at", m))} ${s.unit}`).join(", ")}`).join("; ")}.`);
+  }
+  let challengeDone: boolean | null = null;
+  if (setup.challenge) {
+    const res = evalModelChallenge(setup.challenge, run, labels, tu);
+    challengeDone = res.done;
+    lines.push(`Challenge "${setup.challenge.title}" (${setup.challenge.goal}): if they ran these settings now it would ${res.done ? "SUCCEED" : `not succeed yet. Engine feedback: ${res.hint}`} (the student only sees the result after they run it, so don't give the outcome away).`);
   }
   return { text: lines.join("\n"), challengeDone };
 }

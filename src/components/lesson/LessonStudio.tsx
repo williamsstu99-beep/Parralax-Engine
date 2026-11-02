@@ -5,9 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CircuitLab from "@/components/lab/CircuitLab";
 import MotionLab from "@/components/lab/MotionLab";
 import PopulationLab from "@/components/lab/PopulationLab";
+import ModelLab, { type ModelScene } from "@/components/lab/ModelLab";
 import TutorPanel from "@/components/lesson/TutorPanel";
 import { Mark, Wordmark } from "@/components/brand/Mark";
-import { EXAMPLE_LESSON, MOTION_EXAMPLE, POP_EXAMPLE } from "@/engine/spec/fixture";
+import { EXAMPLE_LESSON, MODEL_EXAMPLE, MOTION_EXAMPLE } from "@/engine/spec/fixture";
 import { popScene } from "@/engine/spec/population";
 import type { PopulationSetup } from "@/engine/truth/population/solver";
 import { motionScene } from "@/engine/spec/motion";
@@ -19,16 +20,15 @@ import type { Sample } from "@/engine/lens/circuit/samples";
 import type { Board } from "@/engine/lens/circuit/board";
 
 const EXAMPLES = [
+  "Year 10: what happens to blood sugar after a meal?",
+  "Year 11: why do reactions go faster when it's hotter?",
+  "Year 9: why does a cup of tea cool fast, then slowly?",
+  "Year 12: how does the heart pump blood around the body?",
   "Year 9: why do bulbs in series get dimmer?",
   "Year 10: what angle throws a ball furthest?",
-  "Year 11: why does an LED need a resistor?",
-  "Year 11: friction and forces on a slope",
-  "Year 12: terminal velocity and parachutes",
-  "Year 7: what makes a complete circuit?",
-  "Year 11: predators, prey and pest control in New Zealand",
 ];
 const STEPS = ["Reading your request", "Planning the lesson", "Building the simulations", "Checking every simulation with the solver", "Writing explanations and questions"];
-const ENGINE_LABEL = { circuits: "Circuits", motion: "Motion", populations: "Populations" } as const;
+const ENGINE_LABEL = { circuits: "Circuits", motion: "Motion", populations: "Populations", model: "Simulation" } as const;
 
 type Status = { kind: "idle" } | { kind: "loading"; started: number } | { kind: "error"; message: string; details?: string[] } | { kind: "ready"; lesson: Lesson; example: boolean };
 
@@ -66,7 +66,7 @@ export default function LessonStudio() {
         <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-16 sm:py-24">
           <div className="flex flex-col gap-3">
             <h1 className="text-4xl font-semibold tracking-[-0.03em] text-balance sm:text-5xl">What do you want to teach?</h1>
-            <p className="text-lg text-[var(--muted)]">Describe a concept and a year level. You&apos;ll get interactive simulations (circuits, forces and motion, or populations), challenges, explanations at three levels, and questions, all checked by real solvers.</p>
+            <p className="text-lg text-[var(--muted)]">Describe a concept and a year level. Any science concept: human biology, chemistry or physics. You&apos;ll get an interactive simulation built for it, challenges, explanations at three levels, and questions. Every number comes from the engine, and every model is checked against real-world facts.</p>
           </div>
           <form onSubmit={e => { e.preventDefault(); generate(request); }} className="flex flex-col gap-3">
             <label htmlFor="request" className="sr-only">Lesson request</label>
@@ -87,8 +87,8 @@ export default function LessonStudio() {
                 className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--fg)]">See a pre-made example lesson</button>
               <button type="button" onClick={() => setStatus({ kind: "ready", lesson: MOTION_EXAMPLE, example: true })} disabled={status.kind === "loading"}
                 className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--fg)]">a motion example</button>
-              <button type="button" onClick={() => setStatus({ kind: "ready", lesson: POP_EXAMPLE, example: true })} disabled={status.kind === "loading"}
-                className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--fg)]">or a populations example</button>
+              <button type="button" onClick={() => setStatus({ kind: "ready", lesson: MODEL_EXAMPLE, example: true })} disabled={status.kind === "loading"}
+                className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--fg)]">or a heat example</button>
             </div>
           </form>
           {status.kind === "loading" && <Progress started={status.started} />}
@@ -136,11 +136,13 @@ function LessonView({ lesson, example }: { lesson: Lesson; example: boolean }) {
   }), [scene, sceneIdx]);
   const motion = useMemo(() => (scene.motion ? motionScene(scene.motion, `scene-${sceneIdx}`, scene.heading, scene.intro) : null), [scene, sceneIdx]);
   const population = useMemo(() => (scene.population ? popScene(scene.population, `scene-${sceneIdx}`, scene.heading, scene.intro) : null), [scene, sceneIdx]);
+  const modelScene: ModelScene | null = useMemo(() => (scene.setup ? { ...scene.setup, id: `scene-${sceneIdx}`, title: scene.heading, summary: scene.intro } : null), [scene, sceneIdx]);
   // The student's live simulation, read by the tutor when they send a message.
   const sim = useRef<Sim>({});
   const onBoardChange = useCallback((b: Board) => { sim.current = { board: b }; }, []);
   const onSetupChange = useCallback((m: MotionSetup) => { sim.current = { motion: m }; }, []);
   const onPopChange = useCallback((p: PopulationSetup) => { sim.current = { population: p }; }, []);
+  const onValuesChange = useCallback((v: Record<string, number>) => { sim.current = { values: v }; }, []);
   const getSim = useCallback(() => sim.current, []);
 
   return (
@@ -167,7 +169,8 @@ function LessonView({ lesson, example }: { lesson: Lesson; example: boolean }) {
 
       <section className="flex flex-col gap-4">
         <p className="max-w-3xl text-[17px] leading-relaxed">{scene.intro}</p>
-        {lesson.engine === "motion" && motion ? <MotionLab key={motion.id} initial={motion} embedded onSetupChange={onSetupChange} />
+        {lesson.engine === "model" && lesson.model && modelScene ? <ModelLab key={modelScene.id} model={lesson.model} scene={modelScene} onValuesChange={onValuesChange} />
+          : lesson.engine === "motion" && motion ? <MotionLab key={motion.id} initial={motion} embedded onSetupChange={onSetupChange} />
           : lesson.engine === "populations" && population ? <PopulationLab key={population.id} initial={population} embedded onSetupChange={onPopChange} />
           : <CircuitLab key={sample.id} initial={sample} embedded onBoardChange={onBoardChange} />}
       </section>

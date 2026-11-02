@@ -13,6 +13,7 @@ import type { Solution } from "../truth/circuit/types";
 import type { ChallengeDef, Check, Lesson, Scene } from "./lesson";
 import { validateMotion } from "./motion";
 import { validatePopulation } from "./population";
+import { validateModelLesson } from "./model";
 
 export const GRID = { w: 22, h: 14 };
 
@@ -154,6 +155,14 @@ export function validateLesson(lesson: Lesson): ValidationResult {
     if (!Number.isInteger(q.answer_index)) out.errors.push(`question ${i + 1} answer_index must be a whole number`);
     if (q.answer_index < 0 || q.answer_index >= q.choices.length) out.errors.push(`question ${i + 1} has an answer_index outside its choices`);
   });
+  if (lesson.engine === "model") {
+    lesson.scenes.forEach((s, i) => {
+      if (s.board || s.challenge || s.motion || s.population) out.errors.push(`scene ${i + 1} ("${s.heading}"): this is a model lesson, so scenes only need "setup"`);
+    });
+    validateModelLesson(lesson.model, lesson.scenes, out);
+    return out;
+  }
+  if (lesson.model) out.errors.push(`only model lessons have a top-level "model"`);
   lesson.scenes.forEach((s, i) => {
     const where = `scene ${i + 1} ("${s.heading}")`;
     if (lesson.engine === "circuits") {
