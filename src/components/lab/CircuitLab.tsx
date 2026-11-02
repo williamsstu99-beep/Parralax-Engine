@@ -55,7 +55,12 @@ const mix = (t: number) => {
 
 /* ---------------- component ---------------- */
 
-export default function CircuitLab({ initial, embedded = false, onBoardChange }: { initial?: Sample; embedded?: boolean; onBoardChange?: (board: Board) => void } = {}) {
+export default function CircuitLab({ initial, embedded = false, workshop = false, onBoardChange, onCaption }: {
+  initial?: Sample; embedded?: boolean;
+  /** Workshop mode: no numbers anywhere, parts pop in, and a plain-English caption instead of the diagnostics panel. */
+  workshop?: boolean;
+  onBoardChange?: (board: Board) => void; onCaption?: (text: string) => void;
+} = {}) {
   const [state, dispatch] = useReducer(reducer, null, () => ({ board: structuredClone(initial?.board ?? loadSample("bulb")), past: [], selected: null, sampleId: initial?.id ?? "bulb" }));
   const [preview, setPreview] = useState<Board | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -240,6 +245,8 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
   const selPart = state.selected?.type === "part" ? board.parts.find(p => p.id === state.selected!.id) : undefined;
   const selWire = state.selected?.type === "wire" ? board.wires.find(w => w.id === state.selected!.id) : undefined;
   const challenge = sample.challenge && sol ? sample.challenge.check(state.board, sol) : null;
+  const caption = workshop ? workshopCaption(board, sol) : "";
+  useEffect(() => { if (workshop) onCaption?.(caption); }, [workshop, caption, onCaption]);
   const batteryAmps = board.parts.filter(p => p.kind === "battery").reduce((s, p) => s + Math.abs(sol?.components[p.id]?.amps ?? 0), 0);
   const nodeCount = new Set(net.circuit.components.flatMap(c => [c.a, c.b])).size;
   const wireAmps = (wid: string) => Math.max(0, ...net.segs.filter(s => s.wireId === wid).map(s => Math.abs(sol?.components[s.id]?.amps ?? 0)));
@@ -279,16 +286,16 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
       </header>
       )}
 
-      <div className={`grid flex-1 gap-4 lg:grid-cols-[132px_minmax(0,1fr)_320px] ${embedded ? "" : "p-4 sm:p-6"}`}>
+      <div className={`grid flex-1 gap-4 ${workshop ? "lg:grid-cols-[120px_minmax(0,1fr)]" : "lg:grid-cols-[132px_minmax(0,1fr)_320px]"} ${embedded ? "" : "p-4 sm:p-6"}`}>
         {/* tray */}
         <aside aria-label="Components" className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
           <p className="hidden font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--muted)] lg:block">Components</p>
-          {TRAY.map(kind => {
+          {TRAY.map((kind, ti) => {
             const demo: Part = { id: "demo", kind, x: 0, y: 0, rot: 0, ...CATALOG[kind].defaults, closed: kind === "switch" ? false : undefined };
             return (
-              <button key={kind} title={CATALOG[kind].blurb}
+              <button key={kind} title={CATALOG[kind].blurb} style={workshop ? { animationDelay: `${1.1 + ti * 0.09}s` } : undefined}
                 onPointerDown={e => { e.preventDefault(); setDrag({ kind: "new", part: kind, over: null, cx: e.clientX, cy: e.clientY, startX: e.clientX, startY: e.clientY }); }}
-                className={`flex min-w-[96px] shrink-0 touch-none select-none flex-col items-center gap-1 rounded-2xl border px-2 py-2.5 text-[13px] transition-all ${armed === kind ? "border-[var(--volt)]/70 bg-[rgba(255,181,71,0.08)] shadow-[0_0_18px_-4px_rgba(255,181,71,0.5)]" : "glass hover:border-[var(--line-strong)]"}`}>
+                className={`${workshop ? "anim-pop " : ""}flex min-w-[96px] shrink-0 touch-none select-none flex-col items-center gap-1 rounded-2xl border px-2 py-2.5 text-[13px] transition-all ${armed === kind ? "border-[var(--volt)]/70 bg-[rgba(255,181,71,0.08)] shadow-[0_0_18px_-4px_rgba(255,181,71,0.5)]" : "glass hover:border-[var(--line-strong)]"}`}>
                 <TrayIcon part={demo} />
                 {CATALOG[kind].label}
               </button>
@@ -302,7 +309,8 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
           {sample.challenge && (
             <ChallengeBanner title={sample.challenge.title} goal={sample.challenge.goal} done={!!challenge?.done} message={challenge?.hint ?? ""} />
           )}
-          <div ref={wrapRef} className="glass relative w-full overflow-hidden rounded-[28px]" style={{ aspectRatio: `${W} / ${H}` }}>
+          <div ref={wrapRef} className={`glass relative w-full overflow-hidden rounded-[28px] ${workshop ? "mx-auto" : ""}`}
+            style={{ aspectRatio: `${W} / ${H}`, maxWidth: workshop ? `max(320px, calc((100dvh - 340px) * ${W / H}))` : undefined }}>
             <svg ref={svgRef} viewBox={`0 0 ${W * G} ${H * G}`} className={`absolute inset-0 h-full w-full touch-none select-none ${mode === "wire" || armed ? "cursor-crosshair" : ""}`}
               onPointerDown={onBoardDown} role="application" aria-label="Circuit board">
               <defs>
@@ -384,9 +392,14 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
               )}
             </svg>
             <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+            {workshop && selPart && (
+              <div className="glass anim-rise absolute top-3 right-3 z-10 w-[min(280px,calc(100%-24px))] rounded-[22px] p-4" onPointerDown={e => e.stopPropagation()}>
+                <Inspector part={selPart} sol={sol} minimal onChange={patch => updatePart(selPart.id, patch)} onRotate={rotateSelected} onDelete={removeSelected} />
+              </div>
+            )}
 
             {/* hover readout */}
-            {hoverPart && sol && !drag && (
+            {!workshop && hoverPart && sol && !drag && (
               <div className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-[var(--line)] bg-[rgba(19,27,46,0.95)] px-3 py-2 font-mono text-xs leading-5 shadow-lg"
                 style={{ left: `${(hoverPart.x / W) * 100}%`, top: `calc(${(hoverPart.y / H) * 100}% + 34px)` }}>
                 <div className="font-sans text-[13px] font-medium">{CATALOG[hoverPart.kind].label}</div>
@@ -401,7 +414,7 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-[var(--muted)]">
+          <div className={`${workshop ? "hidden" : "flex"} flex-wrap items-center gap-x-6 gap-y-1 text-sm text-[var(--muted)]`}>
             <span>Battery supplies <b className="font-mono font-medium text-[var(--flow)]">{fmtAmps(batteryAmps)}</b></span>
             <span className="hidden sm:inline">{sample.summary}</span>
             <span className="ml-auto font-mono text-xs">Truth · nodal analysis · {nodeCount} nodes{dynamic ? " · stepping live" : ""}</span>
@@ -409,7 +422,7 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
         </section>
 
         {/* inspector */}
-        <aside className="flex flex-col gap-4">
+        <aside className={workshop ? "hidden" : "flex flex-col gap-4"}>
           <div className="glass rounded-[28px] p-5">
             {selPart ? (
               <Inspector part={selPart} sol={sol} onChange={patch => updatePart(selPart.id, patch)} onRotate={rotateSelected} onDelete={removeSelected} />
@@ -479,7 +492,7 @@ function Stepper({ id, label, values, value, fmt, onChange }: { id: string; labe
   );
 }
 
-function Inspector({ part, sol, onChange, onRotate, onDelete }: { part: Part; sol: Solution | null; onChange: (p: Partial<Part>) => void; onRotate: () => void; onDelete: () => void }) {
+function Inspector({ part, sol, onChange, onRotate, onDelete, minimal = false }: { part: Part; sol: Solution | null; onChange: (p: Partial<Part>) => void; onRotate: () => void; onDelete: () => void; minimal?: boolean }) {
   const r = sol?.components[part.id];
   const info = CATALOG[part.kind];
   return (
@@ -488,7 +501,7 @@ function Inspector({ part, sol, onChange, onRotate, onDelete }: { part: Part; so
         <h2 className="text-lg font-semibold">{info.label}</h2>
         <p className="text-sm text-[var(--muted)]">{info.blurb}</p>
       </div>
-      <div className="flex flex-col gap-1.5 rounded-2xl bg-black/25 px-3.5 py-3 ring-1 ring-white/5">
+      <div className={`${minimal ? "hidden" : "flex"} flex-col gap-1.5 rounded-2xl bg-black/25 px-3.5 py-3 ring-1 ring-white/5`}>
         <Readout label={part.kind === "battery" ? "Supplying" : "Current"} value={fmtAmps(r?.amps ?? 0)} color="var(--flow)" />
         <Readout label={part.kind === "battery" ? "Terminal voltage" : "Voltage across"} value={fmtVolts(r?.volts ?? 0)} color="var(--volt)" />
         <Readout label={part.kind === "battery" ? "Power delivered" : "Power"} value={fmtWatts(r?.watts ?? 0)} color="var(--fg)" />
@@ -519,4 +532,30 @@ function Inspector({ part, sol, onChange, onRotate, onDelete }: { part: Part; so
       </div>
     </div>
   );
+}
+
+/** What's going on in the circuit, in a sentence a Year 7 can follow. */
+function workshopCaption(board: Board, sol: Solution | null): string {
+  if (!board.parts.some(p => p.kind === "battery")) return "Drag a battery onto the board to power your circuit. Then add a bulb and join them up with wires.";
+  if (!sol) return "";
+  const bad = sol.diagnostics.find(d => d.severity === "error") ?? sol.diagnostics.find(d => d.severity === "warning");
+  if (bad && bad.code !== "open_circuit" && bad.code !== "floating") return bad.message;
+  const flowing = board.parts.some(p => p.kind === "battery" && Math.abs(sol.components[p.id]?.amps ?? 0) > 1e-4);
+  if (!flowing) {
+    const openSwitch = board.parts.some(p => p.kind === "switch" && !p.closed);
+    return openSwitch
+      ? "The switch is open, so there's a gap in the loop and no electricity can flow. Tap the switch to close it."
+      : "There's a gap somewhere, so electricity can't get all the way round. Every part needs a wire to the next, in one complete loop.";
+  }
+  const lit = board.parts.filter(p => (p.kind === "bulb" || p.kind === "led") && (sol.components[p.id]?.brightness ?? 0) > 0.1);
+  const bulbs = board.parts.filter(p => p.kind === "bulb");
+  if (lit.some(p => p.kind === "led")) return "The LED glows! LEDs only let electricity through one way round. Try turning it around and see what happens.";
+  if (bulbs.length >= 2) {
+    const b = bulbs.map(p => sol.components[p.id]?.brightness ?? 0), dimmer = Math.max(...b) < 0.55;
+    return dimmer
+      ? "The bulbs share the battery's push one after the other, so each one glows dimmer. Can you wire them side by side so they both shine brightly?"
+      : "Each bulb has its own path to the battery, so each gets the full push and shines brightly. That's a parallel circuit.";
+  }
+  if (lit.length) return "Electricity flows out of the battery, through the bulb and back again, and the bulb lights up. Try adding a second bulb. Brighter or dimmer?";
+  return "Electricity is flowing round the loop. Add a bulb to see it.";
 }
