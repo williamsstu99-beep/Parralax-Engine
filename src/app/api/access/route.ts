@@ -1,4 +1,10 @@
-import { ACCESS_COOKIE, ACCESS_MAX_AGE, accessCode, accessToken } from "@/lib/access";
+import { cookies } from "next/headers";
+import { ACCESS_COOKIE, ACCESS_MAX_AGE, accessCode, accessToken, hasAccess } from "@/lib/access";
+
+/** Has this browser already entered the code? Lets the page ask for it up front. */
+export async function GET() {
+  return Response.json({ ok: await hasAccess((await cookies()).get(ACCESS_COOKIE)?.value) }, { headers: { "cache-control": "no-store" } });
+}
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null) as { code?: unknown } | null;
