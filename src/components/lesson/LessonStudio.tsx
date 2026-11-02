@@ -14,7 +14,7 @@ import { SCENES } from "@/lib/scenes";
 
 type Stage = Extract<LessonEvent, { t: "stage" }>;
 type Status =
-  | { kind: "idle"; error?: { message: string; details?: string[] } }
+  | { kind: "idle"; error?: { message: string; details?: string[] }; needsCode?: boolean }
   | { kind: "loading"; started: number; request: string; stage?: Stage; fixes: string[] }
   | { kind: "ready"; lesson: Lesson; example: boolean };
 
@@ -31,7 +31,8 @@ export default function LessonStudio() {
     try {
       // First: is this one of the hand-crafted simulations? If so, go straight there.
       const pick = await fetch("/api/scene", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) })
-        .then(r => (r.ok ? r.json() : { scene: "other" })).catch(() => ({ scene: "other" })) as { scene: string };
+        .then(r => (r.status === 401 ? { scene: "locked" } : r.ok ? r.json() : { scene: "other" })).catch(() => ({ scene: "other" })) as { scene: string };
+      if (pick.scene === "locked") { setStatus({ kind: "idle", needsCode: true }); return; }
       if (pick.scene !== "other") {
         setStatus(st => st.kind === "loading" ? { ...st, stage: { t: "stage", stage: "writing", label: "Building your simulation" } } : st);
         await new Promise(r => setTimeout(r, 1400)); // let the build animation play for a beat
@@ -39,6 +40,7 @@ export default function LessonStudio() {
         return;
       }
       const res = await fetch("/api/lesson", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) });
+      if (res.status === 401) { setStatus({ kind: "idle", needsCode: true }); return; }
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
         fail(data.error ?? "Something went wrong.", data.details);
@@ -67,6 +69,17 @@ export default function LessonStudio() {
     }
   }
 
+  /** Checks the access code; on success, carries straight on with the request. */
+  async function unlock(code: string): Promise<string | null> {
+    try {
+      const res = await fetch("/api/access", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code }) });
+      if (!res.ok) return ((await res.json().catch(() => ({}))) as { error?: string }).error ?? "That code isn't right.";
+    } catch { return "Couldn't check the code. Check your connection and try again."; }
+    setStatus({ kind: "idle" });
+    void generate(request);
+    return null;
+  }
+
   const ready = status.kind === "ready";
   return (
     <div className="relative min-h-screen overflow-x-clip bg-[var(--ink)] text-[var(--fg)]">
@@ -87,7 +100,7 @@ export default function LessonStudio() {
 
       {status.kind === "ready" ? <LessonView lesson={status.lesson} example={status.example} />
         : status.kind === "loading" ? <BuildStage request={status.request} started={status.started} stage={status.stage} fixes={status.fixes} />
-        : <Hero value={request} onChange={setRequest} onSubmit={() => generate(request)} busy={false} error={status.error} />}
+        : <Hero value={request} onChange={setRequest} onSubmit={() => generate(request)} busy={false} error={status.error} needsCode={!!status.needsCode} onUnlock={unlock} />}
     </div>
   );
 }

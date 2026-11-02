@@ -67,3 +67,30 @@ export function font(weight: number, px: number) {
   if (!family && typeof document !== "undefined") family = getComputedStyle(document.body).fontFamily || "system-ui, sans-serif";
   return `${weight} ${px}px ${family || "system-ui, sans-serif"}`;
 }
+
+/**
+ * A crisp force arrow: thin solid shaft, slim head, a dark under-stroke so it
+ * reads on busy backgrounds without any glow. Draws from (x1,y1) to (x2,y2).
+ */
+export function arrow(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color: string, label?: string) {
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  if (len < 6) return;
+  const ux = (x2 - x1) / len, uy = (y2 - y1) / len, head = Math.min(12, len * 0.45), wide = head * 0.42;
+  const bx = x2 - ux * head, by = y2 - uy * head;
+  const shape = () => {
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(bx + ux * 1.5, by + uy * 1.5);
+  };
+  const tip = () => {
+    ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(bx - uy * wide, by + ux * wide); ctx.lineTo(bx + uy * wide, by - ux * wide); ctx.closePath();
+  };
+  ctx.save();
+  ctx.shadowBlur = 0; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(5, 7, 13, 0.55)"; ctx.lineWidth = 5; shape(); ctx.stroke(); tip(); ctx.stroke();
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2; shape(); ctx.stroke(); tip(); ctx.fill();
+  ctx.beginPath(); ctx.arc(x1, y1, 2.5, 0, Math.PI * 2); ctx.fill();
+  if (label) {
+    ctx.font = font(600, 13); ctx.textBaseline = "middle"; ctx.textAlign = "left";
+    ctx.fillText(label, x2 + 10, y2 + uy * 2);
+  }
+  ctx.restore();
+}

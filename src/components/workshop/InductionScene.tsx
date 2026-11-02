@@ -199,7 +199,7 @@ export default function InductionScene() {
       for (let k = -4; k <= 4; k++) { const a = -Math.PI / 2 + (k / 4) * 1.05; ctx.beginPath(); ctx.moveTo(mx0 + Math.cos(a) * r * 0.82, my0 + Math.sin(a) * r * 0.82); ctx.lineTo(mx0 + Math.cos(a) * r * 0.92, my0 + Math.sin(a) * r * 0.92); ctx.strokeStyle = k === 0 ? "#cfe9ff" : "rgba(150,175,230,0.5)"; ctx.stroke(); }
       const a = -Math.PI / 2 + Math.max(-1, Math.min(1, I)) * 1.05;
       ctx.beginPath(); ctx.moveTo(mx0, my0); ctx.lineTo(mx0 + Math.cos(a) * r * 0.85, my0 + Math.sin(a) * r * 0.85);
-      ctx.strokeStyle = "#ff7a85"; ctx.lineWidth = 3; ctx.shadowColor = "#ff7a85"; ctx.shadowBlur = 8; ctx.stroke();
+      ctx.strokeStyle = "#ff8a94"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke();
       ctx.beginPath(); ctx.arc(mx0, my0, 4, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
       ctx.shadowBlur = 0; ctx.font = font(600, 12); ctx.fillStyle = "rgba(200,212,235,0.75)"; ctx.textAlign = "center";
       ctx.fillText("−", mx0 - r * 0.72, my0 - 6); ctx.fillText("+", mx0 + r * 0.72, my0 - 6);

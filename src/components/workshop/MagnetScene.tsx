@@ -116,7 +116,7 @@ export default function MagnetScene() {
           ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)))); ctx.stroke();
           // Energy flowing along the line, north to south.
           ctx.save(); ctx.setLineDash([2, 22]); ctx.lineDashOffset = -time * 40; ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 2.4;
-          ctx.shadowColor = "rgba(110,231,255,0.9)"; ctx.shadowBlur = 6; ctx.stroke(); ctx.restore();
+          ctx.stroke(); ctx.restore();
         }
       }
     } else {
