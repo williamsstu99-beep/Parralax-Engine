@@ -3,21 +3,29 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Mark } from "@/components/brand/Mark";
 import type { Board } from "@/engine/lens/circuit/board";
+import type { MotionSetup } from "@/engine/truth/motion/types";
+import type { PopulationSetup } from "@/engine/truth/population/solver";
 import type { Lesson } from "@/engine/spec/lesson";
 import type { TutorEvent } from "@/engine/tutor/prompt";
+import { useVoice } from "./useVoice";
+
+/** What the student has in front of them: a circuit board, motion settings or population settings. */
+export interface Sim { board?: Board; motion?: MotionSetup; population?: PopulationSetup; values?: Record<string, number> }
 
 interface Msg { role: "user" | "assistant"; content: string; error?: boolean }
 
 const STARTERS = ["I'm stuck. Can I have a hint?", "Why did that happen?", "Can you explain this another way?"];
 const MAX_SENT = 40; // matches the route's limit
 
-/** **bold** is the only formatting the tutor uses; render that and keep line breaks. */
+/** The tutor uses **bold** and *italics* at most; render those and keep line breaks. */
 function Rich({ text }: { text: string }) {
-  return <>{text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.startsWith("**") && part.endsWith("**") ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong> : <Fragment key={i}>{part}</Fragment>)}</>;
+  return <>{text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
+      : part.length > 2 && part.startsWith("*") && part.endsWith("*") ? <em key={i}>{part.slice(1, -1)}</em>
+      : <Fragment key={i}>{part}</Fragment>)}</>;
 }
 
-export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Lesson; sceneIdx: number; getBoard: () => Board }) {
+export default function TutorPanel({ lesson, sceneIdx, getSim }: { lesson: Lesson; sceneIdx: number; getSim: () => Sim }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
@@ -25,6 +33,18 @@ export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Les
   const abort = useRef<AbortController | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const voice = useVoice();
+  const [readAloud, setReadAloud] = useState(false);
+  const [voiceNote, setVoiceNote] = useState("");
+  useEffect(() => {
+    try { if (localStorage.getItem("dl-read-aloud") === "1") setReadAloud(true); } catch { /* storage unavailable */ } // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
+  const toggleReadAloud = () => {
+    const next = !readAloud;
+    setReadAloud(next);
+    if (!next) voice.stopSpeaking();
+    try { localStorage.setItem("dl-read-aloud", next ? "1" : "0"); } catch { /* storage unavailable */ }
+  };
 
   useEffect(() => { list.current?.scrollTo({ top: list.current.scrollHeight }); }, [msgs]);
   useEffect(() => { if (open) input.current?.focus(); }, [open]);
@@ -43,10 +63,11 @@ export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Les
     const ctrl = new AbortController();
     abort.current = ctrl;
     const patch = (fn: (m: Msg) => Msg) => setMsgs(ms => [...ms.slice(0, -1), fn(ms[ms.length - 1])]);
+    let reply = "", failed = false;
     try {
       const res = await fetch("/api/tutor", {
         method: "POST", headers: { "content-type": "application/json" }, signal: ctrl.signal,
-        body: JSON.stringify({ lesson, sceneIndex: sceneIdx, board: getBoard(), messages: sent.map(({ role, content }) => ({ role, content })) }),
+        body: JSON.stringify({ lesson, sceneIndex: sceneIdx, ...getSim(), messages: sent.map(({ role, content }) => ({ role, content })) }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
@@ -64,8 +85,8 @@ export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Les
         for (const line of lines) {
           if (!line) continue;
           const e = JSON.parse(line) as TutorEvent;
-          if (e.t === "text") patch(m => ({ ...m, content: m.content + e.v }));
-          else if (e.t === "error") patch(m => ({ ...m, content: m.content ? `${m.content}\n\n${e.v}` : e.v, error: true }));
+          if (e.t === "text") { reply += e.v; patch(m => ({ ...m, content: m.content + e.v })); }
+          else if (e.t === "error") { failed = true; patch(m => ({ ...m, content: m.content ? `${m.content}\n\n${e.v}` : e.v, error: true })); }
         }
       }
     } catch {
@@ -75,8 +96,18 @@ export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Les
       setMsgs(ms => (ms[ms.length - 1]?.role === "assistant" && !ms[ms.length - 1].content ? ms.slice(0, -1) : ms));
       setBusy(false);
       abort.current = null;
+      if (readAloud && reply && !failed && !ctrl.signal.aborted) voice.speak(reply);
     }
   }
+
+  // Talk instead of typing: words appear as you speak, and send when you stop.
+  const sendRef = useRef(send);
+  useEffect(() => { sendRef.current = send; });
+  const mic = () => {
+    if (voice.listening) { voice.stopListening(); return; }
+    setVoiceNote("");
+    voice.listen(t => setDraft(t), t => { if (t) sendRef.current(t); }, msg => setVoiceNote(msg));
+  };
 
   if (!open) {
     return (
@@ -94,15 +125,24 @@ export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Les
         <Mark size={24} />
         <div className="flex flex-col leading-tight">
           <span className="font-semibold">Tutor</span>
-          <span className="text-xs text-[var(--muted)]">Sees your circuit · numbers come from the solver</span>
+          <span className="text-xs text-[var(--muted)]">Sees your simulation · numbers come from the solver</span>
         </div>
-        <button onClick={() => setOpen(false)} aria-label="Close tutor" className="ml-auto rounded-lg px-2 py-1 text-xl leading-none text-[var(--muted)] hover:bg-[var(--raise)] hover:text-[var(--fg)]">×</button>
+        {voice.canSpeak && (
+          <button onClick={toggleReadAloud} aria-pressed={readAloud} title={readAloud ? "Stop reading replies aloud" : "Read replies aloud"}
+            className={`ml-auto rounded-lg p-1.5 ${readAloud ? "text-[var(--flow)]" : "text-[var(--muted)]"} hover:bg-[var(--raise)]`}>
+            <span className="sr-only">{readAloud ? "Stop reading replies aloud" : "Read replies aloud"}</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4V5z" />{readAloud ? <><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" /></> : <path d="m16 9 5 6m0-6-5 6" />}
+            </svg>
+          </button>
+        )}
+        <button onClick={() => { voice.stopSpeaking(); voice.stopListening(); setOpen(false); }} aria-label="Close tutor" className={`${voice.canSpeak ? "" : "ml-auto "}rounded-lg px-2 py-1 text-xl leading-none text-[var(--muted)] hover:bg-[var(--raise)] hover:text-[var(--fg)]`}>×</button>
       </header>
 
       <div ref={list} aria-live="polite" className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
         {msgs.length === 0 && (
           <div className="flex flex-col gap-3">
-            <p className="text-[15px] leading-relaxed text-[var(--muted)]">Kia ora! Ask me anything about this lesson. I can see your circuit as you change it, so try something and ask me what happened.</p>
+            <p className="text-[15px] leading-relaxed text-[var(--muted)]">Kia ora! Ask me anything about this lesson. I can see your simulation as you change it, so try something and ask me what happened.</p>
             <div className="flex flex-wrap gap-2">
               {STARTERS.map(s => (
                 <button key={s} onClick={() => send(s)} className="rounded-full border border-[var(--line)] px-3 py-1.5 text-left text-sm text-[var(--muted)] hover:border-[var(--flow)] hover:text-[var(--fg)]">{s}</button>
@@ -120,12 +160,25 @@ export default function TutorPanel({ lesson, sceneIdx, getBoard }: { lesson: Les
         ))}
       </div>
 
+      {voiceNote && <p role="alert" className="border-t border-[var(--line)] px-3 pt-2 text-xs text-[var(--volt)]">{voiceNote}</p>}
+      {voice.speaking && (
+        <button onClick={voice.stopSpeaking} className="mx-3 mt-2 self-start rounded-full border border-[var(--line)] px-3 py-1 text-xs text-[var(--muted)]">■ Stop reading</button>
+      )}
       <form onSubmit={e => { e.preventDefault(); send(draft); }} className="flex items-end gap-2 border-t border-[var(--line)] p-3">
         <label htmlFor="tutor-input" className="sr-only">Message the tutor</label>
         <textarea id="tutor-input" ref={input} value={draft} onChange={e => setDraft(e.target.value)} rows={1} maxLength={1000}
           onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(draft); } }}
-          placeholder="Ask a question…"
+          placeholder={voice.listening ? "Listening…" : "Ask a question…"}
           className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-[var(--line)] bg-[var(--ink)] px-3 py-2.5 text-[15px] placeholder:text-[var(--dim)]" />
+        {voice.canListen && !busy && (
+          <button type="button" onClick={mic} aria-pressed={voice.listening} title={voice.listening ? "Stop listening" : "Talk to the tutor"}
+            className={`flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-xl border ${voice.listening ? "animate-pulse border-[var(--bad)] bg-[#2A1517] text-[var(--bad)]" : "border-[var(--line)] text-[var(--muted)] hover:text-[var(--fg)]"}`}>
+            <span className="sr-only">{voice.listening ? "Stop listening" : "Talk to the tutor"}</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+            </svg>
+          </button>
+        )}
         {busy
           ? <button type="button" onClick={() => abort.current?.abort()} className="h-[44px] rounded-xl border border-[var(--line)] px-4 text-sm">Stop</button>
           : <button type="submit" disabled={!draft.trim()} className="h-[44px] rounded-xl bg-[var(--flow)] px-4 text-sm font-semibold text-[var(--ink)] disabled:opacity-40">Send</button>}

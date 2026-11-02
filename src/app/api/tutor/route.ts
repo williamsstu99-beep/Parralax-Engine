@@ -4,12 +4,28 @@ import { ACCESS_COOKIE, hasAccess } from "@/lib/access";
 import { z } from "zod";
 import { LessonSpec, PartSpec, WireSpec } from "@/engine/spec/lesson";
 import { sceneBoard } from "@/engine/spec/validate";
-import { boardSnapshot } from "@/engine/tutor/snapshot";
+import { boardSnapshot, modelSnapshot, motionSnapshot, populationSnapshot } from "@/engine/tutor/snapshot";
+import { popScene } from "@/engine/spec/population";
+import type { MotionChallenge } from "@/engine/lens/motion/model";
 import { TUTOR_SYSTEM, boardMessage, lessonContext, type TutorEvent } from "@/engine/tutor/prompt";
 
 export const maxDuration = 120;
 
 const MODEL = "claude-opus-5-5";
+
+const PlanetSchema = z.enum(["earth", "moon", "mars", "jupiter"]);
+// Generous bounds: the lab's sliders stay well inside these.
+const MotionSetupSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("projectile"), speed: z.number().min(0).max(100), angle: z.number().min(-90).max(90), height: z.number().min(0).max(500),
+    mass: z.number().positive().max(500), planet: PlanetSchema, air: z.boolean(), dragArea: z.number().positive().max(100),
+    target: z.object({ x: z.number().min(0).max(1000), width: z.number().positive().max(100) }).optional(),
+  }),
+  z.object({
+    kind: z.literal("ramp"), angle: z.number().min(0).max(80), length: z.number().positive().max(100), mass: z.number().positive().max(500),
+    friction: z.number().min(0).max(2), force: z.number().min(-1000).max(1000), start: z.number().min(0).max(100), startSpeed: z.number().min(-50).max(50), planet: PlanetSchema,
+  }),
+]);
 
 const Body = z.object({
   lesson: LessonSpec,
@@ -17,7 +33,14 @@ const Body = z.object({
   board: z.object({
     parts: z.array(PartSpec).max(40),
     wires: z.array(WireSpec.extend({ points: WireSpec.shape.points.max(40) })).max(120),
-  }),
+  }).optional(),
+  motion: MotionSetupSchema.optional(),
+  values: z.record(z.string().max(60), z.number()).optional(),
+  population: z.object({
+    prey: z.number().min(0).max(1e6), predators: z.number().min(0).max(1e5), growth: z.number().min(0).max(5), capacity: z.number().min(1).max(1e6),
+    hunting: z.number().min(0).max(1000), conversion: z.number().min(0).max(1), predatorDeath: z.number().min(0).max(5),
+    trapping: z.number().min(0).max(0.99), harvest: z.number().min(0).max(0.99), controlStart: z.number().min(0).max(200), years: z.number().min(1).max(200),
+  }).optional(),
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(4000) })).min(1).max(40),
 });
 
@@ -26,7 +49,7 @@ export async function POST(req: Request) {
   if (!(await hasAccess((await cookies()).get(ACCESS_COOKIE)?.value))) return Response.json({ error: "Enter the access code first." }, { status: 401 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "That tutor request wasn't in the expected format." }, { status: 400 });
-  const { lesson, sceneIndex, board, messages } = parsed.data;
+  const { lesson, sceneIndex, board, motion, population, values, messages } = parsed.data;
   const scene = lesson.scenes[sceneIndex];
   if (!scene) return Response.json({ error: "That scene isn't in the lesson." }, { status: 400 });
   if (messages[0].role !== "user" || messages[messages.length - 1].role !== "user") {
@@ -38,8 +61,18 @@ export async function POST(req: Request) {
   if (!apiKey) return Response.json({ error: "The tutor isn't set up yet: the server has no API key." }, { status: 503 });
   const client = new Anthropic({ apiKey, baseURL: process.env.PARALLAX_ANTHROPIC_BASE_URL ?? "https://api.anthropic.com" });
 
-  // Truth: solve the student's board on the server, so the tutor only ever quotes real readings.
-  const snap = boardSnapshot(sceneBoard({ ...scene, board }), scene.challenge);
+  // Truth: solve the student's simulation on the server, so the tutor only ever quotes real readings.
+  const missing = lesson.engine === "circuits" ? !board : lesson.engine === "motion" ? !motion || !scene.motion
+    : lesson.engine === "model" ? !values || !lesson.model || !scene.setup : !population || !scene.population;
+  if (missing) return Response.json({ error: "The tutor needs the simulation for this scene." }, { status: 400 });
+  if (lesson.engine === "model") {
+    // Keep the student's values inside each setting's range.
+    for (const s of lesson.model!.settings) values![s.id] = Math.min(s.max, Math.max(s.min, values![s.id] ?? s.value));
+  }
+  const snap = lesson.engine === "model" ? modelSnapshot(lesson.model!, values!, scene.setup!)
+    : lesson.engine === "circuits" ? boardSnapshot(sceneBoard({ ...scene, board }), scene.challenge)
+    : lesson.engine === "motion" ? motionSnapshot(motion!, scene.motion!.challenge as MotionChallenge | undefined, scene.motion!.editable)
+    : (() => { const ps = popScene(scene.population!, "", "", ""); return populationSnapshot(population!, ps.names, ps.challenge, scene.population!.editable); })();
 
   const stream = client.beta.messages.stream({
     model: MODEL,
@@ -75,7 +108,7 @@ export async function POST(req: Request) {
           : e instanceof Anthropic.RateLimitError ? "The tutor is busy right now. Try again in a minute."
           : e instanceof Anthropic.APIError ? `The AI service returned an error (${e.status}).`
           : "Something went wrong talking to the tutor.";
-        if (!(e instanceof Anthropic.APIError)) console.error("tutor stream failed", e);
+        console.error("tutor stream failed", e instanceof Anthropic.APIError ? `${e.status} ${e.message}` : e);
         send({ t: "error", v });
       }
       controller.close();
