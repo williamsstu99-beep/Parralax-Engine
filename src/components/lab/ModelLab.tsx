@@ -80,6 +80,10 @@ export default function ModelLab({ model, scene, onValuesChange }: { model: Mode
   const reset = () => { setValues(start); setT(0); setPlaying(false); setRan(false); };
   const challenge = scene.challenge && ran ? evalModelChallenge(scene.challenge, run, labels, model.time_unit) : null;
   const placed = model.stocks.filter(s => s.x !== null && s.y !== null);
+  // Stocks and anything shown on a gauge or graph come first; other helpers fold away.
+  const shown = new Set([...model.stocks.map(s => s.id), ...model.gauges.map(g => g.what), ...scene.graph]);
+  const main = [...model.stocks, ...model.variables].filter(x => shown.has(x.id));
+  const extra = model.variables.filter(x => !shown.has(x.id));
   const unit = model.time_unit;
 
   return (
@@ -95,14 +99,16 @@ export default function ModelLab({ model, scene, onValuesChange }: { model: Mode
         )}
         {!run.ok && <div role="alert" className="rounded-xl border border-[var(--bad)] bg-[#2A1517] px-4 py-3 text-sm">These settings push the model outside what it can simulate: {run.error}</div>}
 
-        <div className={`grid gap-3 ${model.particles ? "xl:grid-cols-[minmax(0,1fr)_300px]" : ""}`}>
-          {placed.length > 0 && <Diagram model={model} run={run} t={t} frame={clock} colors={colors} units={units} />}
-          {model.particles && <Particles model={model} run={run} t={t} frame={clock} />}
-        </div>
+        {placed.length > 0 && <Diagram model={model} run={run} t={t} frame={clock} colors={colors} units={units} />}
 
-        {model.gauges.length > 0 && (
-          <div className="flex flex-wrap gap-3">
-            {model.gauges.map(g => <Gauge key={g.what} label={g.label} value={valueAt(run, g.what, t)} min={g.min} max={g.max} unit={units[g.what] ?? ""} />)}
+        {(model.particles || model.gauges.length > 0) && (
+          <div className={`grid gap-3 ${model.particles ? "sm:grid-cols-[minmax(0,300px)_minmax(0,1fr)]" : ""}`}>
+            {model.particles && <Particles model={model} run={run} t={t} frame={clock} />}
+            {model.gauges.length > 0 && (
+              <div className="flex flex-wrap content-start gap-3">
+                {model.gauges.map(g => <Gauge key={g.what} label={g.label} value={valueAt(run, g.what, t)} min={g.min} max={g.max} unit={units[g.what] ?? ""} />)}
+              </div>
+            )}
           </div>
         )}
 
@@ -152,12 +158,15 @@ export default function ModelLab({ model, scene, onValuesChange }: { model: Mode
 
         <div className="flex flex-col gap-2 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
           <h2 className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--muted)]">Live readings</h2>
-          {[...model.stocks, ...model.variables].map(x => (
-            <div key={x.id} className="flex items-baseline justify-between gap-3">
-              <span className="text-sm text-[var(--muted)]">{x.label}</span>
-              <span className="shrink-0 font-mono text-[15px] font-medium tabular-nums" style={{ color: colors[x.id] }}>{num(valueAt(run, x.id, t))} {x.unit}</span>
-            </div>
-          ))}
+          {main.map(x => <Reading key={x.id} label={x.label} value={`${num(valueAt(run, x.id, t))} ${x.unit}`} color={colors[x.id]} />)}
+          {extra.length > 0 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-[var(--muted)]">More readings ({extra.length})</summary>
+              <div className="mt-2 flex flex-col gap-2">
+                {extra.map(x => <Reading key={x.id} label={x.label} value={`${num(valueAt(run, x.id, t))} ${x.unit}`} color={colors[x.id]} />)}
+              </div>
+            </details>
+          )}
         </div>
 
         <details className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 text-sm">
@@ -174,12 +183,47 @@ export default function ModelLab({ model, scene, onValuesChange }: { model: Mode
   );
 }
 
+function Reading({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-sm text-[var(--muted)]">{label}</span>
+      <span className="shrink-0 font-mono text-[15px] font-medium tabular-nums" style={{ color }}>{value}</span>
+    </div>
+  );
+}
+
 /* ---------------- diagram ---------------- */
 
+type P = { x: number; y: number };
+
+/** Push overlapping boxes apart (the AI's positions are a sketch, not exact). */
+function separate(points: Map<string, P>, bw: number, bh: number, W: number, H: number) {
+  const ids = [...points.keys()], gapX = bw + 100, gapY = bh + 76;
+  for (let iter = 0; iter < 80; iter++) {
+    let moved = false;
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      const a = points.get(ids[i])!, b = points.get(ids[j])!;
+      const dx = b.x - a.x, dy = b.y - a.y, ox = gapX - Math.abs(dx), oy = gapY - Math.abs(dy);
+      if (ox > 0 && oy > 0) {
+        moved = true;
+        // Separate along the axis that needs the smaller push.
+        if (ox / gapX < oy / gapY) { const s = (dx >= 0 ? 1 : -1) * (ox / 2 + 1); a.x -= s; b.x += s; }
+        else { const s = (dy >= 0 ? 1 : -1) * (oy / 2 + 1); a.y -= s; b.y += s; }
+      }
+    }
+    for (const p of points.values()) { p.x = Math.min(W - bw / 2 - 12, Math.max(bw / 2 + 12, p.x)); p.y = Math.min(H - bh / 2 - 12, Math.max(bh / 2 + 12, p.y)); }
+    if (!moved) break;
+  }
+}
+
 function Diagram({ model, run, t, frame, colors, units }: { model: ModelSpecDef; run: ModelRun; t: number; frame: number; colors: Record<string, string>; units: Record<string, string> }) {
-  const W = 800, H = 380, BW = 150, BH = 84;
+  const onDiagram = model.stocks.filter(s => s.x !== null && s.y !== null);
+  const n = onDiagram.length;
+  const W = 900, H = n > 4 ? 480 : 400;
+  const BW = n <= 3 ? 170 : n <= 5 ? 150 : 132, BH = n <= 3 ? 90 : n <= 5 ? 80 : 72;
   const pos = (s: ModelSpecDef["stocks"][number]) => ({ x: 20 + BW / 2 + (s.x! / 100) * (W - 40 - BW), y: 20 + BH / 2 + (s.y! / 100) * (H - 40 - BH) });
-  const placed = new Map(model.stocks.filter(s => s.x !== null && s.y !== null).map(s => [s.id, pos(s)]));
+  const placed = new Map(onDiagram.map(s => [s.id, pos(s)]));
+  separate(placed, BW, BH, W, H);
   const maxFlow = Math.max(1e-12, ...model.flows.flatMap(f => run.series[f.id]?.map(Math.abs) ?? []));
 
   // Where a flow starts and ends: box edges, or an "outside" point near the box.
@@ -188,32 +232,50 @@ function Diagram({ model, run, t, frame, colors, units }: { model: ModelSpecDef;
     const s = Math.min(Math.abs(dx) > 1e-6 ? (BW / 2 + 6) / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? (BH / 2 + 6) / Math.abs(dy) : Infinity);
     return { x: from.x + dx * s, y: from.y + dy * s };
   };
-  const outside = (p: { x: number; y: number }, n: number) => {
-    const dirs = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 }];
-    const d = p.y < H / 2 ? dirs[n % 2 === 0 ? 1 : 2] : dirs[n % 2 === 0 ? 0 : 3];
-    return { x: Math.min(W - 24, Math.max(24, p.x + d.x * 150)), y: Math.min(H - 20, Math.max(20, p.y + d.y * 100)) };
+  const outside = (p: P, k: number) => {
+    const order = p.y < H / 2 ? [{ x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0.7, y: -0.7 }, { x: -0.7, y: -0.7 }] : [{ x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0.7, y: 0.7 }, { x: -0.7, y: 0.7 }];
+    const d = order[k % order.length];
+    return { x: Math.min(W - 24, Math.max(24, p.x + d.x * (BW / 2 + 70))), y: Math.min(H - 20, Math.max(20, p.y + d.y * (BH / 2 + 60))) };
   };
 
-  let outCount = 0;
+  // Each stock's flows to/from outside take turns around it so they don't overlap.
+  const outUsed = new Map<string, number>();
+  const pairCount = new Map<string, number>(), pairSeen = new Map<string, number>();
+  const pairKey = (f: ModelSpecDef["flows"][number]) => [f.from ?? `out:${f.to}`, f.to ?? `out:${f.from}`].sort().join("|");
+  for (const f of model.flows) pairCount.set(pairKey(f), (pairCount.get(pairKey(f)) ?? 0) + 1);
   const flows = model.flows.map(f => {
     const a = f.from ? placed.get(f.from) : undefined, b = f.to ? placed.get(f.to) : undefined;
     if ((f.from && !a) || (f.to && !b)) return null; // an end is off the diagram
-    const pa = a ?? outside(b!, outCount++), pb = b ?? outside(a!, outCount++);
-    const p0 = a ? edge(a, pb) : pa, p1 = b ? edge(b, pa) : pb;
+    const host = (f.from ?? f.to)!, k = outUsed.get(host) ?? 0;
+    if (!a || !b) outUsed.set(host, k + 1);
+    const pa = a ?? outside(b!, k), pb = b ?? outside(a!, k);
+    let p0 = a ? edge(a, pb) : pa, p1 = b ? edge(b, pa) : pb;
+    // Fan out flows that share the same two ends.
+    const key = pairKey(f), total = pairCount.get(key)!, idx = pairSeen.get(key) ?? 0;
+    pairSeen.set(key, idx + 1);
+    if (total > 1) {
+      const len = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1, nx = -(p1.y - p0.y) / len, ny = (p1.x - p0.x) / len;
+      const off = (idx - (total - 1) / 2) * 30;
+      p0 = { x: p0.x + nx * off, y: p0.y + ny * off }; p1 = { x: p1.x + nx * off, y: p1.y + ny * off };
+    }
     return { f, p0, p1, cloud0: !a, cloud1: !b };
-  }).filter(Boolean) as { f: ModelSpecDef["flows"][number]; p0: { x: number; y: number }; p1: { x: number; y: number }; cloud0: boolean; cloud1: boolean }[];
+  }).filter(Boolean) as { f: ModelSpecDef["flows"][number]; p0: P; p1: P; cloud0: boolean; cloud1: boolean }[];
+  const crowded = flows.length > 7;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[radial-gradient(120%_90%_at_50%_0%,#152039_0%,var(--ink)_70%)]">
       <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`Diagram at ${num(t)} ${model.time_unit}`}>
-        <defs><marker id="m-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#55617D" /></marker></defs>
+        <defs><marker id="m-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#55617D" /></marker></defs>
         {flows.map(({ f, p0, p1, cloud0, cloud1 }) => {
           const r = valueAt(run, f.id, t), mag = Math.abs(r) / maxFlow, dir = r >= 0 ? 1 : -1;
           const len = Math.hypot(p1.x - p0.x, p1.y - p0.y);
           const dots = Math.max(2, Math.round(len / 45));
           const phase = (frame * (0.15 + 0.85 * mag) * 0.8) % 1;
           const color = colors[f.id];
-          const mid = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+          // Label beside the line, not on it.
+          const nx = -(p1.y - p0.y) / (len || 1), ny = (p1.x - p0.x) / (len || 1), side = ny > 0 ? -1 : 1;
+          const mid = { x: (p0.x + p1.x) / 2 + nx * 10 * side, y: (p0.y + p1.y) / 2 + ny * 10 * side };
+          const opp = { x: (p0.x + p1.x) / 2 - nx * 20 * side, y: (p0.y + p1.y) / 2 - ny * 20 * side + 4 };
           return (
             <g key={f.id}>
               {cloud0 && <circle cx={p0.x} cy={p0.y} r={12} fill="none" stroke="#3A4868" strokeDasharray="3 3" />}
@@ -223,8 +285,9 @@ function Diagram({ model, run, t, frame, colors, units }: { model: ModelSpecDef;
                 let u = (i / dots + phase) % 1; if (dir < 0) u = 1 - u;
                 return <circle key={i} cx={p0.x + (p1.x - p0.x) * u} cy={p0.y + (p1.y - p0.y) * u} r={3 + 2 * mag} fill={color} opacity={0.9} />;
               })}
-              <text x={mid.x} y={mid.y - 10} textAnchor="middle" className="text-[11px]" fill={color}>{f.label}</text>
-              <text x={mid.x} y={mid.y + 18} textAnchor="middle" className="fill-[var(--muted)] font-mono text-[10px]">{num(r)} {units[f.id]}</text>
+              <title>{`${f.label}: ${num(r)} ${units[f.id]}`}</title>
+              <text x={mid.x} y={mid.y - 8} textAnchor="middle" className="text-[11px]" fill={color} stroke="#0a0f1c" strokeWidth={3} paintOrder="stroke">{f.label.length > 20 ? `${f.label.slice(0, 19)}…` : f.label}</text>
+              {!crowded && <text x={opp.x} y={opp.y} textAnchor="middle" className="fill-[var(--muted)] font-mono text-[10px]" stroke="#0a0f1c" strokeWidth={3} paintOrder="stroke">{num(r)} {units[f.id]}</text>}
             </g>
           );
         })}
@@ -314,7 +377,7 @@ function MiniGraph({ run, id, t, label, unit, color, timeUnit, duration }: { run
           <g key={y}><line x1={m.l} x2={GW - m.r} y1={gy(y)} y2={gy(y)} stroke="rgba(160,180,220,0.08)" /><text x={m.l - 5} y={gy(y) + 3} textAnchor="end" className="fill-[var(--dim)] font-mono text-[10px]">{num(y)}</text></g>
         ))}
         {Array.from({ length: Math.floor(duration / xs) + 1 }, (_, i) => i * xs).map(x => <text key={x} x={gx(x)} y={GH - 6} textAnchor="middle" className="fill-[var(--dim)] font-mono text-[10px]">{num(x)}</text>)}
-        <text x={GW - m.r} y={GH - 6} textAnchor="end" className="fill-[var(--muted)] font-mono text-[9px]">{timeUnit}</text>
+        <text x={m.l - 5} y={GH - 6} textAnchor="end" className="fill-[var(--muted)] font-mono text-[9px]">{timeUnit.slice(0, 3)}</text>
         <path d={d(Infinity)} fill="none" stroke={color} strokeOpacity={0.22} strokeWidth={2} />
         <path d={d(t)} fill="none" stroke={color} strokeWidth={2.2} />
         <line x1={gx(t)} x2={gx(t)} y1={m.t} y2={GH - m.b} stroke="var(--fg)" strokeOpacity={0.5} strokeDasharray="3 3" />

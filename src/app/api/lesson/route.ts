@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
 import { cookies } from "next/headers";
 import { ACCESS_COOKIE, hasAccess } from "@/lib/access";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
@@ -11,6 +12,19 @@ export const maxDuration = 300;
 
 const MODEL = "claude-opus-5-5";
 const MAX_ATTEMPTS = 3;
+
+// The general model format is too large for strict structured output, so for
+// model lessons the AI writes plain JSON against this schema and the engine's
+// own checks (schema, then full validation) enforce it, with repair on failure.
+const MODEL_SCHEMA = JSON.stringify(z.toJSONSchema(LESSON_FORMATS.model));
+const strict = (engine: Engine) => engine !== "model";
+
+/** Pull the JSON object out of a reply, tolerating code fences or stray words. */
+function extractJson(text: string): unknown {
+  const a = text.indexOf("{"), b = text.lastIndexOf("}");
+  if (a < 0 || b < a) throw new Error("no JSON object");
+  return JSON.parse(text.slice(a, b + 1));
+}
 
 export async function POST(req: Request) {
   // Checked here as well as in the proxy, so these paid endpoints never rely on the matcher alone.
@@ -32,7 +46,9 @@ export async function POST(req: Request) {
 
   try {
     const engine = await chooseEngine(client, request);
-    const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: lessonRequest(request, engine) }];
+    const content = strict(engine) ? lessonRequest(request, engine)
+      : `${lessonRequest(request, engine)}\n\nReply with a single JSON object and nothing else, matching this JSON Schema:\n${MODEL_SCHEMA}`;
+    const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content }];
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const stream = client.beta.messages.stream({
         model: MODEL,
@@ -40,7 +56,7 @@ export async function POST(req: Request) {
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         system: [{ type: "text", text: LESSON_SYSTEM, cache_control: { type: "ephemeral" } }],
-        output_config: { effort: "medium", format: betaZodOutputFormat(LESSON_FORMATS[engine]) },
+        output_config: strict(engine) ? { effort: "medium", format: betaZodOutputFormat(LESSON_FORMATS[engine]) } : { effort: "medium" },
         messages,
       });
       const msg = await stream.finalMessage();
@@ -50,11 +66,18 @@ export async function POST(req: Request) {
       const text = msg.content.flatMap(b => (b.type === "text" ? [b.text] : [])).join("");
       let lesson: Lesson | null = null;
       try {
-        const parsed = LessonSpec.safeParse(lessonFromGen(JSON.parse(text)));
+        const raw = lessonFromGen(strict(engine) ? JSON.parse(text) : extractJson(text));
+        // Model lessons weren't schema-constrained, so check them against their own format first.
+        const shaped = strict(engine) ? { success: true as const } : LESSON_FORMATS.model.safeParse(raw);
+        const parsed = shaped.success ? LessonSpec.safeParse(raw) : shaped;
         if (parsed.success) lesson = parsed.data;
         else lastErrors = parsed.error.issues.slice(0, 10).map(i => `${i.path.join(".")}: ${i.message}`);
-      } catch {
-        if (msg.stop_reason !== "max_tokens") lastErrors = ["the response wasn't valid JSON"];
+      } catch (e) {
+        if (msg.stop_reason !== "max_tokens") {
+          const why = e instanceof Error ? e.message : String(e);
+          console.error("lesson generation: unparseable reply", why, text.slice(0, 300), "…", text.slice(-300));
+          lastErrors = [`the response wasn't valid JSON (${why}); reply with only the JSON object, using double quotes and no comments or trailing commas`];
+        }
       }
 
       if (lesson) {

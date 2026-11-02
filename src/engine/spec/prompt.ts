@@ -68,6 +68,7 @@ You model the concept as a system that changes over time. Work out what builds u
 - variables: helper quantities (pH from concentration, rate constants that depend on temperature, totals). They can use stocks, settings, flows, other variables and t, but must not go round in a circle.
 - settings: inputs with realistic min, max, default and step. Every combination within the ranges must run sensibly: the engine tests the extremes and random mixtures. Use 0/1 settings for on/off choices.
 - Choose time_unit and duration so the interesting part fills the run.
+- Units must describe the numbers: a fraction from 0 to 1 has unit "" or "fraction", not "%"; use % only for 0-100. Keep labels short (under 25 characters) and variables to the ones that teach something (usually under 8).
 - Use real units and realistic values. Prefer established relationships (Newton's law of cooling, first-order kinetics, Arrhenius-style temperature dependence, Michaelis–Menten uptake, exponential decay, logistic growth, Hooke's law) and keep it as simple as teaches the idea.
 
 ## Expressions
@@ -80,7 +81,7 @@ Numbers, ids, + - * / ^, parentheses, comparisons (< <= > >= == !=), && || !, co
 - simplifications: say plainly what the model leaves out.
 
 ## Visuals
-- Give stocks an x and y (0-100) to place them on a diagram; flows between placed stocks are drawn as animated arrows, so lay stocks out like the real system (stomach above blood above muscles; left heart beside right heart). Use null to keep abstract stocks off the diagram.
+- Give stocks an x and y (0-100) to place them on a diagram, at least 30 apart across or 35 apart down so the boxes don't overlap; flows between placed stocks are drawn as animated arrows, so lay stocks out like the real system (stomach above blood above muscles; left heart beside right heart). Use null to keep abstract stocks off the diagram.
 - gauges: dials for the 1-3 quantities that matter most.
 - particles: for molecules, ions or cells, list species whose count follows a stock or variable, and a speed (e.g. temperature). null when it wouldn't help.
 
