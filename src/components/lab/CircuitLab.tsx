@@ -10,6 +10,7 @@ import { SAMPLES, type Sample } from "@/engine/lens/circuit/samples";
 import { initialTransientState, solveDC, step } from "@/engine/truth/circuit/solver";
 import type { Solution, TransientState } from "@/engine/truth/circuit/types";
 import { Mark, Wordmark } from "@/components/brand/Mark";
+import ChallengeBanner from "./ChallengeBanner";
 import { G, LED_COLORS, PartSymbol, TrayIcon } from "./symbols";
 import { fmtAmps, fmtFarads, fmtOhms, fmtVolts, fmtWatts } from "./format";
 
@@ -54,7 +55,12 @@ const mix = (t: number) => {
 
 /* ---------------- component ---------------- */
 
-export default function CircuitLab({ initial, embedded = false, onBoardChange }: { initial?: Sample; embedded?: boolean; onBoardChange?: (board: Board) => void } = {}) {
+export default function CircuitLab({ initial, embedded = false, workshop = false, onBoardChange, onCaption }: {
+  initial?: Sample; embedded?: boolean;
+  /** Workshop mode: no numbers anywhere, parts pop in, and a plain-English caption instead of the diagnostics panel. */
+  workshop?: boolean;
+  onBoardChange?: (board: Board) => void; onCaption?: (text: string) => void;
+} = {}) {
   const [state, dispatch] = useReducer(reducer, null, () => ({ board: structuredClone(initial?.board ?? loadSample("bulb")), past: [], selected: null, sampleId: initial?.id ?? "bulb" }));
   const [preview, setPreview] = useState<Board | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -239,6 +245,8 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
   const selPart = state.selected?.type === "part" ? board.parts.find(p => p.id === state.selected!.id) : undefined;
   const selWire = state.selected?.type === "wire" ? board.wires.find(w => w.id === state.selected!.id) : undefined;
   const challenge = sample.challenge && sol ? sample.challenge.check(state.board, sol) : null;
+  const caption = workshop ? workshopCaption(board, sol) : "";
+  useEffect(() => { if (workshop) onCaption?.(caption); }, [workshop, caption, onCaption]);
   const batteryAmps = board.parts.filter(p => p.kind === "battery").reduce((s, p) => s + Math.abs(sol?.components[p.id]?.amps ?? 0), 0);
   const nodeCount = new Set(net.circuit.components.flatMap(c => [c.a, c.b])).size;
   const wireAmps = (wid: string) => Math.max(0, ...net.segs.filter(s => s.wireId === wid).map(s => Math.abs(sol?.components[s.id]?.amps ?? 0)));
@@ -248,13 +256,13 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
     <div className={`flex flex-col text-[var(--fg)] ${embedded ? "" : "min-h-screen bg-[var(--ink)]"}`}>
       {/* top bar */}
       {embedded ? (
-        <div className="flex flex-wrap items-center justify-end gap-2 pb-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 pb-4">
           <button onClick={() => setMode(m => (m === "wire" ? "select" : "wire"))} aria-pressed={mode === "wire"}
-            className={`rounded-lg border px-3 py-2 text-sm font-medium ${mode === "wire" ? "border-[var(--flow)] bg-[#16294A] text-[var(--flow)]" : "border-[var(--line)] bg-[var(--raise)]"}`}>
+            className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-all ${mode === "wire" ? "border-[var(--flow)]/60 bg-[rgba(110,231,255,0.1)] text-[var(--flow)] shadow-[0_0_18px_-4px_rgba(110,231,255,0.6)]" : "btn-ghost"}`}>
             Draw wires <kbd className="ml-1 font-mono text-xs text-[var(--muted)]">W</kbd>
           </button>
-          <button onClick={() => dispatch({ type: "undo" })} disabled={!state.past.length} className="rounded-lg border border-[var(--line)] bg-[var(--raise)] px-3 py-2 text-sm disabled:opacity-40">Undo</button>
-          <button onClick={() => initial && dispatch({ type: "reset", board: initial.board })} className="rounded-lg border border-[var(--line)] bg-[var(--raise)] px-3 py-2 text-sm">Reset</button>
+          <button onClick={() => dispatch({ type: "undo" })} disabled={!state.past.length} className="btn-ghost rounded-full px-3.5 py-2 text-sm disabled:opacity-40">Undo</button>
+          <button onClick={() => initial && dispatch({ type: "reset", board: initial.board })} className="btn-ghost rounded-full px-3.5 py-2 text-sm">Reset</button>
         </div>
       ) : (
       <header className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-[var(--line)] px-4 py-3 sm:px-6">
@@ -278,16 +286,16 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
       </header>
       )}
 
-      <div className={`grid flex-1 gap-4 lg:grid-cols-[132px_minmax(0,1fr)_320px] ${embedded ? "" : "p-4 sm:p-6"}`}>
+      <div className={`grid flex-1 gap-4 ${workshop ? "lg:grid-cols-[120px_minmax(0,1fr)]" : "lg:grid-cols-[132px_minmax(0,1fr)_320px]"} ${embedded ? "" : "p-4 sm:p-6"}`}>
         {/* tray */}
         <aside aria-label="Components" className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
           <p className="hidden font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--muted)] lg:block">Components</p>
-          {TRAY.map(kind => {
+          {TRAY.map((kind, ti) => {
             const demo: Part = { id: "demo", kind, x: 0, y: 0, rot: 0, ...CATALOG[kind].defaults, closed: kind === "switch" ? false : undefined };
             return (
-              <button key={kind} title={CATALOG[kind].blurb}
+              <button key={kind} title={CATALOG[kind].blurb} style={workshop ? { animationDelay: `${1.1 + ti * 0.09}s` } : undefined}
                 onPointerDown={e => { e.preventDefault(); setDrag({ kind: "new", part: kind, over: null, cx: e.clientX, cy: e.clientY, startX: e.clientX, startY: e.clientY }); }}
-                className={`flex min-w-[96px] shrink-0 touch-none select-none flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-[13px] transition-colors ${armed === kind ? "border-[var(--volt)] bg-[#2A2414]" : "border-[var(--line)] bg-[var(--panel)] hover:bg-[var(--raise)]"}`}>
+                className={`${workshop ? "anim-pop " : ""}flex min-w-[96px] shrink-0 touch-none select-none flex-col items-center gap-1 rounded-2xl border px-2 py-2.5 text-[13px] transition-all ${armed === kind ? "border-[var(--volt)]/70 bg-[rgba(255,181,71,0.08)] shadow-[0_0_18px_-4px_rgba(255,181,71,0.5)]" : "glass hover:border-[var(--line-strong)]"}`}>
                 <TrayIcon part={demo} />
                 {CATALOG[kind].label}
               </button>
@@ -299,18 +307,14 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
         {/* board */}
         <section className="flex min-w-0 flex-col gap-3">
           {sample.challenge && (
-            <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border px-4 py-3 ${challenge?.done ? "border-[var(--good)] bg-[#12291F]" : "border-[var(--line)] bg-[var(--panel)]"}`}>
-              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--volt)]">Challenge</span>
-              <span className="font-medium">{sample.challenge.title}</span>
-              <span className="text-sm text-[var(--muted)]">{sample.challenge.goal}</span>
-              <span className={`ml-auto text-sm font-medium ${challenge?.done ? "text-[var(--good)]" : "text-[var(--fg)]"}`}>{challenge?.done ? "✓ " : ""}{challenge?.hint}</span>
-            </div>
+            <ChallengeBanner title={sample.challenge.title} goal={sample.challenge.goal} done={!!challenge?.done} message={challenge?.hint ?? ""} />
           )}
-          <div ref={wrapRef} className="relative w-full overflow-hidden rounded-2xl border border-[var(--line)] bg-[radial-gradient(120%_90%_at_50%_0%,#152039_0%,var(--ink)_70%)]" style={{ aspectRatio: `${W} / ${H}` }}>
+          <div ref={wrapRef} className={`glass relative w-full overflow-hidden rounded-[28px] ${workshop ? "mx-auto" : ""}`}
+            style={{ aspectRatio: `${W} / ${H}`, maxWidth: workshop ? `max(320px, calc((100dvh - 340px) * ${W / H}))` : undefined }}>
             <svg ref={svgRef} viewBox={`0 0 ${W * G} ${H * G}`} className={`absolute inset-0 h-full w-full touch-none select-none ${mode === "wire" || armed ? "cursor-crosshair" : ""}`}
               onPointerDown={onBoardDown} role="application" aria-label="Circuit board">
               <defs>
-                <pattern id="dots" width={G} height={G} patternUnits="userSpaceOnUse"><circle cx={0} cy={0} r={1.6} fill="rgba(160,180,220,0.18)" /></pattern>
+                <pattern id="dots" width={G} height={G} patternUnits="userSpaceOnUse"><circle cx={0} cy={0} r={1.4} fill="rgba(150,175,230,0.16)" /></pattern>
                 <radialGradient id="glow"><stop offset="0" stopColor="#FFD678" stopOpacity="0.9" /><stop offset="1" stopColor="#FFB547" stopOpacity="0" /></radialGradient>
                 {Object.entries(LED_COLORS).map(([c, hex]) => (
                   <radialGradient key={c} id={`glow-${c}`}><stop offset="0" stopColor={hex} stopOpacity="0.85" /><stop offset="1" stopColor={hex} stopOpacity="0" /></radialGradient>
@@ -327,14 +331,15 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
               })}
 
               {/* wires */}
-              {board.wires.map(w => {
+              {board.wires.map((w, wi) => {
                 const v = sol?.nodeVolts[key(w.points[0])] ?? 0;
                 const sel = state.selected?.type === "wire" && state.selected.id === w.id;
                 const d = w.points.map((p, i) => `${i ? "L" : "M"}${p.x * G} ${p.y * G}`).join(" ");
                 return (
                   <g key={w.id}>
                     {sel && <path d={d} fill="none" stroke="rgba(127,216,255,0.35)" strokeWidth={12} strokeLinecap="round" strokeLinejoin="round" />}
-                    <path d={d} fill="none" stroke={flagged.has(w.id) ? "#FF7A6B" : mix(v / vmax)} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+                    <path d={d} pathLength={1} fill="none" stroke={flagged.has(w.id) ? "#FF7A85" : mix(v / vmax)} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round"
+                      className="anim-draw" style={{ animationDelay: `${0.15 + board.parts.length * 0.09 + wi * 0.12}s` }} />
                     <path d={d} fill="none" stroke="transparent" strokeWidth={16}
                       onPointerDown={e => { e.stopPropagation(); if (mode === "wire") setDrag({ kind: "wire", from: snap(toGrid(e.clientX, e.clientY)), to: snap(toGrid(e.clientX, e.clientY)) }); else dispatch({ type: "select", sel: { type: "wire", id: w.id } }); }} />
                   </g>
@@ -348,7 +353,7 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
               })()}
 
               {/* parts */}
-              {board.parts.map(p => {
+              {board.parts.map((p, pi) => {
                 const sel = state.selected?.type === "part" && state.selected.id === p.id;
                 const bad = flagged.has(p.id);
                 const horiz = p.rot % 2 === 0;
@@ -358,12 +363,14 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
                     onPointerDown={e => { e.stopPropagation(); if (armed || mode === "wire") return onBoardDown(e); setDrag({ kind: "move", id: p.id, grab: snap(toGrid(e.clientX, e.clientY)), origin: { x: p.x, y: p.y }, moved: false }); }}
                     onPointerEnter={() => setHover(p.id)} onPointerLeave={() => setHover(h => (h === p.id ? null : h))}
                     className={p.kind === "switch" ? "cursor-pointer" : "cursor-grab"}>
+                    <g className="anim-pop" style={{ animationDelay: `${0.1 + pi * 0.09}s` }}>
                     <g transform={`rotate(${p.rot * 90})`}>
                       {(sel || bad) && <rect x={-G + 4} y={-22} width={2 * G - 8} height={44} rx={12} fill={bad ? "rgba(255,122,107,0.12)" : "rgba(127,216,255,0.10)"} stroke={bad ? "#FF7A6B" : "#7FD8FF"} strokeWidth={1.5} strokeDasharray={bad ? "5 4" : undefined} />}
                       <rect x={-G + 6} y={-20} width={2 * G - 12} height={40} fill="transparent" />
                       <PartSymbol part={p} result={sol?.components[p.id]} />
                     </g>
                     {label && <text x={horiz ? 0 : 26} y={horiz ? -26 : 4} textAnchor={horiz ? "middle" : "start"} fontSize={12.5} fill="#AEB9D2" className="font-mono" pointerEvents="none">{label}</text>}
+                    </g>
                   </g>
                 );
               })}
@@ -385,9 +392,14 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
               )}
             </svg>
             <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+            {workshop && selPart && (
+              <div className="glass anim-rise absolute top-3 right-3 z-10 w-[min(280px,calc(100%-24px))] rounded-[22px] p-4" onPointerDown={e => e.stopPropagation()}>
+                <Inspector part={selPart} sol={sol} minimal onChange={patch => updatePart(selPart.id, patch)} onRotate={rotateSelected} onDelete={removeSelected} />
+              </div>
+            )}
 
             {/* hover readout */}
-            {hoverPart && sol && !drag && (
+            {!workshop && hoverPart && sol && !drag && (
               <div className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-[var(--line)] bg-[rgba(19,27,46,0.95)] px-3 py-2 font-mono text-xs leading-5 shadow-lg"
                 style={{ left: `${(hoverPart.x / W) * 100}%`, top: `calc(${(hoverPart.y / H) * 100}% + 34px)` }}>
                 <div className="font-sans text-[13px] font-medium">{CATALOG[hoverPart.kind].label}</div>
@@ -402,7 +414,7 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-[var(--muted)]">
+          <div className={`${workshop ? "hidden" : "flex"} flex-wrap items-center gap-x-6 gap-y-1 text-sm text-[var(--muted)]`}>
             <span>Battery supplies <b className="font-mono font-medium text-[var(--flow)]">{fmtAmps(batteryAmps)}</b></span>
             <span className="hidden sm:inline">{sample.summary}</span>
             <span className="ml-auto font-mono text-xs">Truth · nodal analysis · {nodeCount} nodes{dynamic ? " · stepping live" : ""}</span>
@@ -410,8 +422,8 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
         </section>
 
         {/* inspector */}
-        <aside className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+        <aside className={workshop ? "hidden" : "flex flex-col gap-4"}>
+          <div className="glass rounded-[28px] p-5">
             {selPart ? (
               <Inspector part={selPart} sol={sol} onChange={patch => updatePart(selPart.id, patch)} onRotate={rotateSelected} onDelete={removeSelected} />
             ) : selWire ? (
@@ -419,7 +431,7 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
                 <h2 className="text-lg font-semibold">Wire</h2>
                 <Readout label="Current" value={fmtAmps(wireAmps(selWire.id))} color="var(--flow)" />
                 <Readout label="Voltage here" value={fmtVolts(sol?.nodeVolts[key(selWire.points[0])] ?? 0)} color="var(--volt)" />
-                <button onClick={removeSelected} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm">Delete wire</button>
+                <button onClick={removeSelected} className="btn-ghost rounded-full px-4 py-2 text-sm">Delete wire</button>
               </div>
             ) : (
               <div className="flex flex-col gap-2 text-sm leading-relaxed text-[var(--muted)]">
@@ -429,8 +441,8 @@ export default function CircuitLab({ initial, embedded = false, onBoardChange }:
               </div>
             )}
           </div>
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
-            <h2 className="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--muted)]">What&apos;s happening</h2>
+          <div className="glass rounded-[28px] p-5">
+            <h2 className="mb-3 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">What&apos;s happening</h2>
             {sol && sol.diagnostics.length ? (
               <ul className="flex flex-col gap-2">
                 {sol.diagnostics.map((d, i) => (
@@ -475,12 +487,12 @@ function Stepper({ id, label, values, value, fmt, onChange }: { id: string; labe
   return (
     <div>
       <label htmlFor={id} className="mb-1 flex justify-between text-sm"><span>{label}</span><span className="font-mono text-[var(--volt)]">{fmt(values[idx])}</span></label>
-      <input id={id} type="range" min={0} max={values.length - 1} step={1} value={idx} onChange={e => onChange(values[+e.target.value])} className="w-full accent-[var(--volt)]" />
+      <input id={id} type="range" min={0} max={values.length - 1} step={1} value={idx} onChange={e => onChange(values[+e.target.value])} className="w-full" style={{ "--fill": `${(idx / Math.max(1, values.length - 1)) * 100}%` } as React.CSSProperties} />
     </div>
   );
 }
 
-function Inspector({ part, sol, onChange, onRotate, onDelete }: { part: Part; sol: Solution | null; onChange: (p: Partial<Part>) => void; onRotate: () => void; onDelete: () => void }) {
+function Inspector({ part, sol, onChange, onRotate, onDelete, minimal = false }: { part: Part; sol: Solution | null; onChange: (p: Partial<Part>) => void; onRotate: () => void; onDelete: () => void; minimal?: boolean }) {
   const r = sol?.components[part.id];
   const info = CATALOG[part.kind];
   return (
@@ -489,7 +501,7 @@ function Inspector({ part, sol, onChange, onRotate, onDelete }: { part: Part; so
         <h2 className="text-lg font-semibold">{info.label}</h2>
         <p className="text-sm text-[var(--muted)]">{info.blurb}</p>
       </div>
-      <div className="flex flex-col gap-1.5 rounded-xl bg-[var(--ink)] px-3 py-2.5">
+      <div className={`${minimal ? "hidden" : "flex"} flex-col gap-1.5 rounded-2xl bg-black/25 px-3.5 py-3 ring-1 ring-white/5`}>
         <Readout label={part.kind === "battery" ? "Supplying" : "Current"} value={fmtAmps(r?.amps ?? 0)} color="var(--flow)" />
         <Readout label={part.kind === "battery" ? "Terminal voltage" : "Voltage across"} value={fmtVolts(r?.volts ?? 0)} color="var(--volt)" />
         <Readout label={part.kind === "battery" ? "Power delivered" : "Power"} value={fmtWatts(r?.watts ?? 0)} color="var(--fg)" />
@@ -497,7 +509,7 @@ function Inspector({ part, sol, onChange, onRotate, onDelete }: { part: Part; so
       {part.kind === "battery" && (
         <div>
           <label htmlFor="volts" className="mb-1 flex justify-between text-sm"><span>Voltage</span><span className="font-mono text-[var(--volt)]">{part.volts} V</span></label>
-          <input id="volts" type="range" min={1.5} max={12} step={0.5} value={part.volts ?? 9} onChange={e => onChange({ volts: +e.target.value })} className="w-full accent-[var(--volt)]" />
+          <input id="volts" type="range" min={1.5} max={12} step={0.5} value={part.volts ?? 9} onChange={e => onChange({ volts: +e.target.value })} className="w-full" style={{ "--fill": `${(((part.volts ?? 9) - 1.5) / 10.5) * 100}%` } as React.CSSProperties} />
         </div>
       )}
       {part.kind === "resistor" && <Stepper id="ohms" label="Resistance" values={RESISTORS} value={part.ohms ?? 330} fmt={fmtOhms} onChange={v => onChange({ ohms: v })} />}
@@ -512,12 +524,38 @@ function Inspector({ part, sol, onChange, onRotate, onDelete }: { part: Part; so
         </div>
       )}
       {part.kind === "switch" && (
-        <button onClick={() => onChange({ closed: !part.closed })} className="rounded-lg bg-[var(--flow)] px-3 py-2 text-sm font-semibold text-[var(--ink)]">{part.closed ? "Open the switch" : "Close the switch"}</button>
+        <button onClick={() => onChange({ closed: !part.closed })} className="btn-primary rounded-full px-4 py-2.5 text-sm">{part.closed ? "Open the switch" : "Close the switch"}</button>
       )}
       <div className="flex gap-2">
-        <button onClick={onRotate} className="flex-1 rounded-lg border border-[var(--line)] px-3 py-2 text-sm">Rotate <kbd className="font-mono text-xs text-[var(--muted)]">R</kbd></button>
-        <button onClick={onDelete} className="flex-1 rounded-lg border border-[var(--line)] px-3 py-2 text-sm">Delete</button>
+        <button onClick={onRotate} className="btn-ghost flex-1 rounded-full px-3 py-2 text-sm">Rotate <kbd className="font-mono text-xs text-[var(--muted)]">R</kbd></button>
+        <button onClick={onDelete} className="btn-ghost flex-1 rounded-full px-3 py-2 text-sm">Delete</button>
       </div>
     </div>
   );
+}
+
+/** What's going on in the circuit, in a sentence a Year 7 can follow. */
+function workshopCaption(board: Board, sol: Solution | null): string {
+  if (!board.parts.some(p => p.kind === "battery")) return "Drag a battery onto the board to power your circuit. Then add a bulb and join them up with wires.";
+  if (!sol) return "";
+  const bad = sol.diagnostics.find(d => d.severity === "error") ?? sol.diagnostics.find(d => d.severity === "warning");
+  if (bad && bad.code !== "open_circuit" && bad.code !== "floating") return bad.message;
+  const flowing = board.parts.some(p => p.kind === "battery" && Math.abs(sol.components[p.id]?.amps ?? 0) > 1e-4);
+  if (!flowing) {
+    const openSwitch = board.parts.some(p => p.kind === "switch" && !p.closed);
+    return openSwitch
+      ? "The switch is open, so there's a gap in the loop and no electricity can flow. Tap the switch to close it."
+      : "There's a gap somewhere, so electricity can't get all the way round. Every part needs a wire to the next, in one complete loop.";
+  }
+  const lit = board.parts.filter(p => (p.kind === "bulb" || p.kind === "led") && (sol.components[p.id]?.brightness ?? 0) > 0.1);
+  const bulbs = board.parts.filter(p => p.kind === "bulb");
+  if (lit.some(p => p.kind === "led")) return "The LED glows! LEDs only let electricity through one way round. Try turning it around and see what happens.";
+  if (bulbs.length >= 2) {
+    const b = bulbs.map(p => sol.components[p.id]?.brightness ?? 0), dimmer = Math.max(...b) < 0.55;
+    return dimmer
+      ? "The bulbs share the battery's push one after the other, so each one glows dimmer. Can you wire them side by side so they both shine brightly?"
+      : "Each bulb has its own path to the battery, so each gets the full push and shines brightly. That's a parallel circuit.";
+  }
+  if (lit.length) return "Electricity flows out of the battery, through the bulb and back again, and the bulb lights up. Try adding a second bulb. Brighter or dimmer?";
+  return "Electricity is flowing round the loop. Add a bulb to see it.";
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Mark, Wordmark } from "@/components/brand/Mark";
+import ChallengeBanner from "./ChallengeBanner";
 import {
   POP_PARAMS, POP_SAMPLES, canEditPop, evalPopChallenge,
   type PopParam, type PopParamDef, type PopScene,
@@ -88,21 +89,16 @@ export default function PopulationLab({ initial, embedded = false, onSetupChange
       <div className={`grid flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px] ${embedded ? "" : "p-4 sm:p-6"}`}>
         <section className="flex min-w-0 flex-col gap-3">
           {scene.challenge && (
-            <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border px-4 py-3 ${challenge?.done ? "border-[var(--good)] bg-[#12291F]" : "border-[var(--line)] bg-[var(--panel)]"}`}>
-              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--volt)]">Challenge</span>
-              <span className="font-medium">{scene.challenge.title}</span>
-              <span className="text-sm text-[var(--muted)]">{scene.challenge.goal}</span>
-              <span className={`ml-auto text-sm font-medium ${challenge?.done ? "text-[var(--good)]" : ""}`}>{challenge ? `${challenge.done ? "✓ " : ""}${challenge.hint}` : "Run it to test your plan."}</span>
-            </div>
+            <ChallengeBanner title={scene.challenge.title} goal={scene.challenge.goal} done={!!challenge?.done} message={challenge ? challenge.hint : "Run it to test your plan."} />
           )}
 
           <Habitat result={result} cur={cur} names={names} hasPred={hasPred} />
 
           <div className="flex flex-wrap items-center gap-2">
             {playing
-              ? <button onClick={() => setPlaying(false)} className="rounded-xl border border-[var(--line)] bg-[var(--raise)] px-5 py-2.5 font-semibold">Pause</button>
-              : <button onClick={run} className="rounded-xl bg-[var(--flow)] px-5 py-2.5 font-semibold text-[var(--ink)] hover:brightness-110">{t > 0 && t < setup.years ? "Resume" : "Run"}</button>}
-            <button onClick={reset} className="rounded-xl border border-[var(--line)] bg-[var(--raise)] px-4 py-2.5 text-sm">Reset</button>
+              ? <button onClick={() => setPlaying(false)} className="btn-ghost rounded-full px-5 py-2.5 font-semibold">Pause</button>
+              : <button onClick={run} className="btn-primary rounded-full px-6 py-2.5">{t > 0 && t < setup.years ? "Resume" : "Run"}</button>}
+            <button onClick={reset} className="btn-ghost rounded-full px-4 py-2.5 text-sm">Reset</button>
             <div role="group" aria-label="Years per second" className="ml-auto flex items-center rounded-lg border border-[var(--line)] p-0.5">
               <span className="px-2 text-xs text-[var(--muted)]">years/s</span>
               {SPEEDS.map(v => (
@@ -112,7 +108,7 @@ export default function PopulationLab({ initial, embedded = false, onSetupChange
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+          <div className="glass rounded-[28px] p-3">
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <div role="group" aria-label="Graph" className="flex rounded-lg border border-[var(--line)] p-0.5">
                 {(["time", "phase"] as const).map(v => (
@@ -132,7 +128,7 @@ export default function PopulationLab({ initial, embedded = false, onSetupChange
 
         <aside className="flex flex-col gap-4">
           <Controls scene={scene} setup={setup} names={names} onChange={change} />
-          <div className="flex flex-col gap-2 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+          <div className="flex flex-col gap-2 glass rounded-[28px] p-4">
             <h2 className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--muted)]">Live counts</h2>
             <Row label="Year" value={cur.t.toFixed(1)} />
             <Row label={cap(names.prey)} value={count(cur.prey)} color={PREY} />
@@ -148,7 +144,7 @@ export default function PopulationLab({ initial, embedded = false, onSetupChange
               </div>
             )}
           </div>
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+          <div className="glass rounded-[28px] p-4">
             <h2 className="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--muted)]">What&apos;s happening</h2>
             {ran && result.diagnostics.length ? (
               <ul className="flex flex-col gap-2">
@@ -314,7 +310,7 @@ function Controls({ scene, setup, names, onChange }: { scene: PopScene; setup: P
   });
   const shown = ORDER.filter(p => !(POP_PARAMS[p].predatorOnly && setup.predators <= 0 && p !== "predators" && !canEditPop(scene, "predators")));
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+    <div className="flex flex-col gap-4 glass rounded-[28px] p-4">
       <h2 className="text-lg font-semibold">Settings</h2>
       {shown.map(p => {
         const def = label(p, POP_PARAMS[p]);
