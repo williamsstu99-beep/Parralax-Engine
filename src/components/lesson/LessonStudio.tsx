@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Mark, Wordmark } from "@/components/brand/Mark";
 import Field from "@/components/brand/Field";
 import Hero from "@/components/lesson/Hero";
 import BuildStage from "@/components/lesson/BuildStage";
 import LessonView from "@/components/lesson/LessonView";
-import { EXAMPLE_LESSON, MODEL_EXAMPLE, MOTION_EXAMPLE } from "@/engine/spec/fixture";
 import type { Lesson } from "@/engine/spec/lesson";
 import type { LessonEvent } from "@/lib/lesson-events";
+import { SCENES } from "@/lib/scenes";
 
 type Stage = Extract<LessonEvent, { t: "stage" }>;
 type Status =
@@ -17,17 +18,26 @@ type Status =
   | { kind: "loading"; started: number; request: string; stage?: Stage; fixes: string[] }
   | { kind: "ready"; lesson: Lesson; example: boolean };
 
-const EXAMPLES = { heat: MODEL_EXAMPLE, circuit: EXAMPLE_LESSON, motion: MOTION_EXAMPLE } as const;
 
 export default function LessonStudio() {
   const [request, setRequest] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const router = useRouter();
 
   async function generate(text: string) {
     if (!text.trim() || status.kind === "loading") return;
     const fail = (message: string, details?: string[]) => setStatus({ kind: "idle", error: { message, details } });
     setStatus({ kind: "loading", started: Date.now(), request: text.trim(), fixes: [] });
     try {
+      // First: is this one of the hand-crafted simulations? If so, go straight there.
+      const pick = await fetch("/api/scene", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) })
+        .then(r => (r.ok ? r.json() : { scene: "other" })).catch(() => ({ scene: "other" })) as { scene: string };
+      if (pick.scene !== "other") {
+        setStatus(st => st.kind === "loading" ? { ...st, stage: { t: "stage", stage: "writing", label: "Building your simulation" } } : st);
+        await new Promise(r => setTimeout(r, 1400)); // let the build animation play for a beat
+        router.push(`/workshop/${pick.scene}`);
+        return;
+      }
       const res = await fetch("/api/lesson", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
@@ -70,16 +80,14 @@ export default function LessonStudio() {
         <div aria-hidden="true" className={`absolute inset-0 -z-10 transition-opacity ${ready ? "border-b border-[var(--line)] bg-[rgba(5,7,13,0.7)] backdrop-blur-xl" : "opacity-0"}`} />
         <button onClick={() => setStatus({ kind: "idle" })} className="flex items-center gap-2.5 text-[18px]" aria-label="Dynamic Learning, start a new lesson"><Mark size={26} /><Wordmark /></button>
         <nav className="ml-auto flex items-center gap-1 text-sm">
-          <Link href="/lab/circuits" className="hidden rounded-full px-3 py-2 text-[var(--muted)] hover:text-[var(--fg)] sm:block">Circuits lab</Link>
-          <Link href="/lab/motion" className="hidden rounded-full px-3 py-2 text-[var(--muted)] hover:text-[var(--fg)] sm:block">Motion lab</Link>
+          {Object.values(SCENES).map(sc => <Link key={sc.id} href={`/workshop/${sc.id}`} className="hidden rounded-full px-3 py-2 text-[var(--muted)] hover:text-[var(--fg)] md:block">{sc.short}</Link>)}
           {ready && <button onClick={() => { setRequest(""); setStatus({ kind: "idle" }); }} className="btn-ghost ml-2 rounded-full px-4 py-2">New lesson</button>}
         </nav>
       </header>
 
       {status.kind === "ready" ? <LessonView lesson={status.lesson} example={status.example} />
         : status.kind === "loading" ? <BuildStage request={status.request} started={status.started} stage={status.stage} fixes={status.fixes} />
-        : <Hero value={request} onChange={setRequest} onSubmit={() => generate(request)} busy={false} error={status.error}
-            onExample={k => { setStatus({ kind: "ready", lesson: EXAMPLES[k], example: true }); window.scrollTo({ top: 0 }); }} />}
+        : <Hero value={request} onChange={setRequest} onSubmit={() => generate(request)} busy={false} error={status.error} />}
     </div>
   );
 }

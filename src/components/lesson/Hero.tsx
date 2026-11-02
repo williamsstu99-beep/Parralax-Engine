@@ -1,21 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { SCENES } from "@/lib/scenes";
 
 /** Ideas the placeholder types out: proof that anything goes, without a wall of buttons. */
 const IDEAS = [
-  "Why does salt melt ice on the roads?",
-  "How does the heart pump blood around the body?",
-  "What happens to blood sugar after a meal?",
-  "Why does a nerve impulse fire all-or-nothing?",
-  "Why do reactions go faster when it's hotter?",
-  "How does a vaccine train your immune system?",
-  "Why does a cup of tea cool fast, then slowly?",
-  "How does caffeine leave your body over a day?",
-  "Why do we breathe faster when we exercise?",
-  "How does an acid–base titration work?",
-  "What angle throws a ball the furthest?",
-  "How do kidneys clean the blood?",
+  "Build me a wing and show how it lifts as the plane speeds up",
+  "Let's build a circuit with a battery and two bulbs",
+  "Show me how magnets attract and repel",
+  "How does a generator make electricity from a magnet?",
+  "What's going on inside a battery?",
+  "Why does a wing stall if it tilts too far?",
+  "Why do bulbs get dimmer when you add more?",
+  "Show me the magnetic field around a bar magnet",
 ];
 
 /** Types each idea out, holds it, then deletes it. Pauses while the student is typing. */
@@ -43,9 +41,9 @@ function useTypewriter(paused: boolean) {
   return { text, full: IDEAS[idea] };
 }
 
-export default function Hero({ value, onChange, onSubmit, busy, error, onExample }: {
+export default function Hero({ value, onChange, onSubmit, busy, error }: {
   value: string; onChange: (v: string) => void; onSubmit: () => void; busy: boolean;
-  error?: { message: string; details?: string[] }; onExample: (which: "heat" | "circuit" | "motion") => void;
+  error?: { message: string; details?: string[] };
 }) {
   const ghost = useTypewriter(value.length > 0 || busy);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -60,7 +58,7 @@ export default function Hero({ value, onChange, onSubmit, busy, error, onExample
         Teach anything.<br /><span className="text-gradient">Watch it come alive.</span>
       </h1>
       <p className="anim-rise mt-6 max-w-xl text-lg leading-relaxed text-[var(--muted)] text-pretty" style={{ animationDelay: "0.22s" }}>
-        Describe any science concept. A live simulation is built for it, checked against real-world facts, and turned into a lesson your class can explore.
+        Say what you want to teach. Watch it build itself in front of your class, then reach in and play with it.
       </p>
 
       <form onSubmit={e => { e.preventDefault(); onSubmit(); }} className="anim-rise relative mt-10 w-full" style={{ animationDelay: "0.32s" }}>
@@ -97,11 +95,13 @@ export default function Hero({ value, onChange, onSubmit, busy, error, onExample
         </div>
       )}
 
-      <div className="anim-fade mt-14 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-[var(--dim)]" style={{ animationDelay: "0.6s" }}>
-        <span>No time? Open a ready-made lesson:</span>
-        {([["heat", "Cooling tea"], ["circuit", "Series circuits"], ["motion", "Projectiles"]] as const).map(([k, label]) => (
-          <button key={k} onClick={() => onExample(k)} disabled={busy} className="text-[var(--muted)] underline decoration-[var(--line-strong)] underline-offset-4 hover:text-[var(--fg)] hover:decoration-[var(--flow)]">{label}</button>
-        ))}
+      <div className="anim-fade mt-14 flex flex-col items-center gap-3" style={{ animationDelay: "0.6s" }}>
+        <span className="text-sm text-[var(--dim)]">Or jump straight in</span>
+        <nav aria-label="Simulations" className="flex flex-wrap justify-center gap-2">
+          {Object.values(SCENES).map((sc, i) => (
+            <Link key={sc.id} href={`/workshop/${sc.id}`} className="anim-rise glass rounded-full px-4 py-2 text-sm text-[var(--fg)]/90 transition-all hover:border-[var(--flow)]/50 hover:text-[var(--fg)] hover:shadow-[0_0_24px_-6px_rgba(110,231,255,0.6)]" style={{ animationDelay: `${0.7 + i * 0.06}s` }}>{sc.short}</Link>
+          ))}
+        </nav>
       </div>
     </div>
   );

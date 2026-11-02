@@ -35,7 +35,7 @@ export default function SceneShell({ id, caption, controls, children, hint, fit 
       </div>
 
       <main className="relative z-10 flex flex-1 flex-col gap-4 px-2 pt-3 pb-4 sm:px-6">
-        <div className={`relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-[radial-gradient(120%_100%_at_50%_0%,#0d1527_0%,#05070d_75%)] shadow-[0_40px_120px_-60px_rgba(110,231,255,0.35)] ${fit ? "p-3 sm:p-5" : "flex-1"}`} style={fit ? undefined : { minHeight: "min(62vh, 640px)" }}>
+        <div className={`relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-[radial-gradient(120%_100%_at_50%_0%,#0d1527_0%,#05070d_75%)] shadow-[0_40px_120px_-60px_rgba(110,231,255,0.35)] ${fit ? "p-3 sm:p-5" : "flex-1 aspect-[4/3.6] sm:aspect-auto sm:min-h-[min(62vh,640px)]"}`}>
           {children}
           {hint && <p className="pointer-events-none absolute top-4 right-5 hidden rounded-full bg-black/40 px-3 py-1.5 text-xs text-[var(--muted)] ring-1 ring-white/5 backdrop-blur sm:block">{hint}</p>}
         </div>
