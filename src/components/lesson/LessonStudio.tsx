@@ -18,6 +18,7 @@ import type { Lesson } from "@/engine/spec/lesson";
 import { sceneBoard, toChallenge } from "@/engine/spec/validate";
 import type { Sample } from "@/engine/lens/circuit/samples";
 import type { Board } from "@/engine/lens/circuit/board";
+import type { LessonEvent } from "@/lib/lesson-events";
 
 const EXAMPLES = [
   "Year 10: what happens to blood sugar after a meal?",
@@ -27,10 +28,16 @@ const EXAMPLES = [
   "Year 9: why do bulbs in series get dimmer?",
   "Year 10: what angle throws a ball furthest?",
 ];
-const STEPS = ["Reading your request", "Planning the lesson", "Building the simulations", "Checking every simulation with the solver", "Writing explanations and questions"];
+const STEPS: { key: Stage["stage"]; label: string }[] = [
+  { key: "engine", label: "Reading your request" },
+  { key: "planning", label: "Working out the science" },
+  { key: "writing", label: "Writing the simulation and lesson" },
+  { key: "checking", label: "Running it and checking real-world facts" },
+];
 const ENGINE_LABEL = { circuits: "Circuits", motion: "Motion", populations: "Populations", model: "Simulation" } as const;
 
-type Status = { kind: "idle" } | { kind: "loading"; started: number } | { kind: "error"; message: string; details?: string[] } | { kind: "ready"; lesson: Lesson; example: boolean };
+type Stage = Extract<LessonEvent, { t: "stage" }>;
+type Status = { kind: "idle" } | { kind: "loading"; started: number; stage?: Stage; fixes: string[] } | { kind: "error"; message: string; details?: string[] } | { kind: "ready"; lesson: Lesson; example: boolean };
 
 export default function LessonStudio() {
   const [request, setRequest] = useState("");
@@ -38,12 +45,33 @@ export default function LessonStudio() {
 
   async function generate(text: string) {
     if (!text.trim()) return;
-    setStatus({ kind: "loading", started: Date.now() });
+    const started = Date.now();
+    setStatus({ kind: "loading", started, fixes: [] });
     try {
       const res = await fetch("/api/lesson", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) });
-      const data = await res.json();
-      if (!res.ok) setStatus({ kind: "error", message: data.error ?? "Something went wrong.", details: data.details });
-      else setStatus({ kind: "ready", lesson: data.lesson, example: false });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        setStatus({ kind: "error", message: data.error ?? "Something went wrong.", details: data.details });
+        return;
+      }
+      // The server streams progress, then the lesson (one JSON object per line).
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buf = "", finished = false;
+      for (;;) {
+        const { value, done } = await reader.read();
+        buf += done ? "\n" : value; // flush a last line with no newline
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line) continue;
+          const e = JSON.parse(line) as LessonEvent;
+          if (e.t === "stage") setStatus(st => st.kind === "loading" ? { ...st, stage: e, fixes: e.stage === "fixing" && e.detail ? [...st.fixes, e.detail] : st.fixes } : st);
+          else if (e.t === "done") { finished = true; setStatus({ kind: "ready", lesson: e.lesson, example: false }); }
+          else { finished = true; setStatus({ kind: "error", message: e.error, details: e.details }); }
+        }
+        if (done) break;
+      }
+      if (!finished) setStatus({ kind: "error", message: "The connection closed before the lesson was ready. Try again." });
     } catch {
       setStatus({ kind: "error", message: "Couldn't reach the server. Check your connection and try again." });
     }
@@ -91,7 +119,7 @@ export default function LessonStudio() {
                 className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--fg)]">or a heat example</button>
             </div>
           </form>
-          {status.kind === "loading" && <Progress started={status.started} />}
+          {status.kind === "loading" && <Progress started={status.started} stage={status.stage} fixes={status.fixes} />}
           {status.kind === "error" && (
             <div role="alert" className="rounded-xl border border-[var(--bad)] bg-[#2A1517] px-4 py-3 text-sm">
               <p className="font-medium">{status.message}</p>
@@ -104,22 +132,34 @@ export default function LessonStudio() {
   );
 }
 
-function Progress({ started }: { started: number }) {
+function Progress({ started, stage, fixes }: { started: number; stage?: Stage; fixes: string[] }) {
   const [now, setNow] = useState(started);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, []);
-  const secs = Math.round((now - started) / 1000);
-  const idx = Math.min(STEPS.length - 1, Math.floor(secs / 20));
+  const secs = Math.max(0, Math.round((now - started) / 1000));
+  // A repair loops back to "working out the science".
+  const at = !stage ? 0 : stage.stage === "fixing" ? 1 : Math.max(0, STEPS.findIndex(st => st.key === stage.stage));
   return (
-    <div aria-live="polite" className="flex flex-col gap-3 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5">
+    <div aria-live="polite" className="flex flex-col gap-4 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5">
       <div className="flex items-center gap-3">
         <Mark size={26} className="animate-pulse" />
-        <span className="font-medium">{STEPS[idx]}…</span>
-        <span className="ml-auto font-mono text-sm text-[var(--muted)]">{secs}s</span>
+        <span className="font-medium">{stage?.label ?? "Reading your request"}…</span>
+        <span className="ml-auto font-mono text-sm text-[var(--muted)]">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}</span>
       </div>
-      <div className="h-1 overflow-hidden rounded-full bg-[var(--raise)]">
-        <div className="h-full rounded-full bg-gradient-to-r from-[var(--flow)] to-[var(--volt)] transition-all duration-500" style={{ width: `${Math.min(95, secs * 0.6)}%` }} />
-      </div>
-      <p className="text-sm text-[var(--muted)]">Usually 1–3 minutes: the simulation is built for your request, then run and checked against real-world facts. Anything that fails is sent back to be fixed automatically.</p>
+      <ol className="flex flex-col gap-2">
+        {STEPS.map((st, i) => (
+          <li key={st.key} className={`flex items-center gap-2.5 text-sm ${i < at ? "text-[var(--muted)]" : i === at ? "text-[var(--fg)]" : "text-[var(--dim)]"}`}>
+            <span className={`flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${i < at ? "border-[var(--good)] text-[var(--good)]" : i === at ? "border-[var(--flow)] text-[var(--flow)]" : "border-[var(--line)]"}`}>{i < at ? "✓" : i + 1}</span>
+            {st.label}
+            {i === at && stage?.stage === "writing" && !!stage.words && <span className="font-mono text-xs text-[var(--muted)]">{stage.words.toLocaleString("en-NZ")} words</span>}
+          </li>
+        ))}
+      </ol>
+      {fixes.length > 0 && (
+        <ul className="flex flex-col gap-1 rounded-xl border border-[var(--volt)]/40 bg-[#2A2414] px-3 py-2 text-sm">
+          {fixes.map((f, i) => <li key={i}>↻ {f}</li>)}
+        </ul>
+      )}
+      <p className="text-sm text-[var(--muted)]">Usually 1–2 minutes. The simulation is built for your request, then the engine runs it and checks it against real-world facts. Anything that fails is sent back to be fixed automatically.</p>
     </div>
   );
 }

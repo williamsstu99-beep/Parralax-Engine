@@ -261,10 +261,14 @@ function Diagram({ model, run, t, frame, colors, units }: { model: ModelSpecDef;
     return { f, p0, p1, cloud0: !a, cloud1: !b };
   }).filter(Boolean) as { f: ModelSpecDef["flows"][number]; p0: P; p1: P; cloud0: boolean; cloud1: boolean }[];
   const crowded = flows.length > 7;
+  // Crop to what's drawn, so a small model doesn't float in empty space.
+  const ys = [...[...placed.values()].flatMap(p => [p.y - BH / 2, p.y + BH / 2]), ...flows.flatMap(f => [f.p0.y - 26, f.p1.y + 26, f.p0.y + 26, f.p1.y - 26])];
+  const top = Math.max(0, Math.min(...ys) - 24), bottom = Math.min(H, Math.max(...ys) + 24);
+  const vbH = Math.max(200, bottom - top), vbY = (top + bottom) / 2 - vbH / 2;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[radial-gradient(120%_90%_at_50%_0%,#152039_0%,var(--ink)_70%)]">
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`Diagram at ${num(t)} ${model.time_unit}`}>
+      <svg viewBox={`0 ${vbY} ${W} ${vbH}`} className="block h-auto w-full" role="img" aria-label={`Diagram at ${num(t)} ${model.time_unit}`}>
         <defs><marker id="m-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#55617D" /></marker></defs>
         {flows.map(({ f, p0, p1, cloud0, cloud1 }) => {
           const r = valueAt(run, f.id, t), mag = Math.abs(r) / maxFlow, dir = r >= 0 ? 1 : -1;
