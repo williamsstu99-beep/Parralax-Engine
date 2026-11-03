@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { SCENES } from "@/lib/scenes";
+import { MAIN_SCENES, SCENES } from "@/lib/scenes";
 
 /** Ideas the placeholder types out: proof that anything goes, without a wall of buttons. */
 const IDEAS = [
@@ -102,7 +102,7 @@ export default function Hero({ value, onChange, onSubmit, busy, error, needsCode
       <div className="anim-fade mt-14 flex flex-col items-center gap-3" style={{ animationDelay: "0.6s" }}>
         <span className="text-sm text-[var(--dim)]">Or jump straight in</span>
         <nav aria-label="Simulations" className="flex flex-wrap justify-center gap-2">
-          {Object.values(SCENES).map((sc, i) => (
+          {MAIN_SCENES.map(id => SCENES[id]).map((sc, i) => (
             <Link key={sc.id} href={`/workshop/${sc.id}`} className="anim-rise glass rounded-full px-4 py-2 text-sm text-[var(--fg)]/90 transition-all hover:border-[var(--flow)]/50 hover:text-[var(--fg)] hover:shadow-[0_0_24px_-6px_rgba(110,231,255,0.6)]" style={{ animationDelay: `${0.7 + i * 0.06}s` }}>{sc.short}</Link>
           ))}
         </nav>

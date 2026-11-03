@@ -10,7 +10,7 @@ import BuildStage from "@/components/lesson/BuildStage";
 import LessonView from "@/components/lesson/LessonView";
 import type { Lesson } from "@/engine/spec/lesson";
 import type { LessonEvent } from "@/lib/lesson-events";
-import { SCENES } from "@/lib/scenes";
+import { MAIN_SCENES, SCENES } from "@/lib/scenes";
 
 type Stage = Extract<LessonEvent, { t: "stage" }>;
 type Status =
@@ -28,6 +28,19 @@ export default function LessonStudio() {
   useEffect(() => {
     fetch("/api/access", { cache: "no-store" }).then(r => r.json()).then((d: { ok?: boolean }) => setLocked(!d.ok)).catch(() => setLocked(null));
   }, []);
+  // Arriving with ?build=... (a reimagining no hand-built scene covers): start building it straight away.
+  const [queued, setQueued] = useState<string | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("build");
+    if (!q) return;
+    window.history.replaceState(null, "", "/");
+    setRequest(q); setQueued(q); // eslint-disable-line react-hooks/set-state-in-effect -- one-off read of the URL on arrival
+  }, []);
+  useEffect(() => {
+    if (queued === null || locked === null) return;
+    setQueued(null); // eslint-disable-line react-hooks/set-state-in-effect -- runs once the access check is back
+    generate(queued);
+  }, [queued, locked]); // eslint-disable-line react-hooks/exhaustive-deps -- generate is rebuilt each render; we only care when these change
 
   function generate(text: string) {
     if (!text.trim() || status.kind === "loading") return;
@@ -105,7 +118,7 @@ export default function LessonStudio() {
         <div aria-hidden="true" className={`absolute inset-0 -z-10 transition-opacity ${ready ? "border-b border-[var(--line)] bg-[rgba(5,7,13,0.7)] backdrop-blur-xl" : "opacity-0"}`} />
         <button onClick={() => setStatus({ kind: "idle" })} className="flex items-center gap-2.5 text-[18px]" aria-label="Dynamic Learning, start a new lesson"><Mark size={26} /><Wordmark /></button>
         <nav className="ml-auto flex items-center gap-1 text-sm">
-          {Object.values(SCENES).map(sc => <Link key={sc.id} href={`/workshop/${sc.id}`} className="hidden rounded-full px-3 py-2 text-[var(--muted)] hover:text-[var(--fg)] md:block">{sc.short}</Link>)}
+          {MAIN_SCENES.map(id => SCENES[id]).map(sc => <Link key={sc.id} href={`/workshop/${sc.id}`} className="hidden rounded-full px-3 py-2 text-[var(--muted)] hover:text-[var(--fg)] md:block">{sc.short}</Link>)}
           {ready && <button onClick={() => { setRequest(""); setStatus({ kind: "idle" }); }} className="btn-ghost ml-2 rounded-full px-4 py-2">New lesson</button>}
         </nav>
       </header>
