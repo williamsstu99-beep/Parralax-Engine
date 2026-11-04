@@ -1,5 +1,5 @@
-import LessonStudio from "@/components/lesson/LessonStudio";
+import EngineHome from "@/components/home/EngineHome";
 
 export default function Home() {
-  return <LessonStudio />;
+  return <EngineHome />;
 }

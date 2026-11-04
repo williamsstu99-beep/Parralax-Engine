@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Mark, Wordmark } from "@/components/brand/Mark";
+import { Wordmark } from "@/components/brand/Mark";
 import ChallengeBanner from "./ChallengeBanner";
 import {
   POP_PARAMS, POP_SAMPLES, canEditPop, evalPopChallenge,
@@ -74,7 +74,7 @@ export default function PopulationLab({ initial, embedded = false, onSetupChange
     <div className={`flex flex-col text-[var(--fg)] ${embedded ? "" : "min-h-screen bg-[var(--ink)]"}`}>
       {!embedded && (
         <header className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-[var(--line)] px-4 py-3 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5 text-[19px]"><Mark size={28} /><Wordmark /></Link>
+          <Link href="/" className="flex items-center gap-2.5 text-[19px]"><Wordmark /></Link>
           <span className="hidden text-[var(--muted)] sm:inline">/</span>
           <span className="font-medium">Populations lab</span>
           <div className="ml-auto">

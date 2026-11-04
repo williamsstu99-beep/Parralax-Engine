@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import SceneShell from "./SceneShell";
 import { Slider } from "./controls";
-import { approach, arrow, font, rng, useCanvas } from "./useCanvas";
+import { approach, arrow, rng, useCanvas } from "./useCanvas";
 
 /**
  * A whole aeroplane in flight with the four forces on it. Thrust against
@@ -97,11 +97,11 @@ export default function PlaneScene() {
     if (groundY < h + 40) {
       const gy = Math.max(groundY, -10);
       const hg = ctx.createLinearGradient(0, gy - 60, 0, gy + 4);
-      hg.addColorStop(0, "rgba(110, 231, 255, 0)"); hg.addColorStop(1, "rgba(110, 231, 255, 0.12)");
+      hg.addColorStop(0, "rgba(255, 170, 90, 0)"); hg.addColorStop(1, "rgba(255, 170, 90, 0.07)");
       ctx.fillStyle = hg; ctx.fillRect(0, gy - 60, w, 64);
       ctx.fillStyle = "#050a15"; ctx.fillRect(0, gy, w, h - gy + 10);
-      ctx.strokeStyle = "rgba(110, 231, 255, 0.5)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
-      ctx.strokeStyle = "rgba(110, 231, 255, 0.12)"; ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(200, 214, 235, 0.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+      ctx.strokeStyle = "rgba(200, 214, 235, 0.07)"; ctx.lineWidth = 1;
       const gap = s * 1.4, off = (S.scroll * s * 2.2) % gap;
       for (let x = -off; x < w + gap * 4; x += gap) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x - (x - px) * 1.6 - gap * 2, h + 10); ctx.stroke(); }
       for (let k = 1; k < 6; k++) { const y = gy + (h - gy) * (k / 6) ** 1.6; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
@@ -143,21 +143,21 @@ export default function PlaneScene() {
     ctx.save();
     ctx.lineJoin = "round";
     const body = ctx.createLinearGradient(0, py - ps * 0.4, 0, py + ps * 0.4);
-    body.addColorStop(0, "#26355a"); body.addColorStop(1, "#0d1528");
+    body.addColorStop(0, "#2d3648"); body.addColorStop(1, "#121722");
     ctx.setLineDash([ps * 12 * drawn, ps * 12]);
-    shape(TAILPLANE); if (drawn >= 1) { ctx.fillStyle = "#1a2643"; ctx.fill(); } ctx.strokeStyle = "rgba(175, 238, 255, 0.7)"; ctx.lineWidth = 1.2; ctx.stroke();
-    shape(BODY); if (drawn >= 1) { ctx.fillStyle = body; ctx.fill(); } ctx.strokeStyle = "rgba(175, 238, 255, 0.95)"; ctx.lineWidth = 1.6; ctx.stroke();
+    shape(TAILPLANE); if (drawn >= 1) { ctx.fillStyle = "#1c2230"; ctx.fill(); } ctx.strokeStyle = "rgba(214, 224, 238, 0.55)"; ctx.lineWidth = 1.2; ctx.stroke();
+    shape(BODY); if (drawn >= 1) { ctx.fillStyle = body; ctx.fill(); } ctx.strokeStyle = "rgba(214, 224, 238, 0.9)"; ctx.lineWidth = 1.6; ctx.stroke();
     ctx.setLineDash([]);
     if (drawn >= 1) {
       // Engine pod, wing slice, windows.
       const [e1x, e1y] = P([0.95, -0.3]), [e2x, e2y] = P([0.05, -0.46]);
       ctx.beginPath(); ctx.ellipse((e1x + e2x) / 2, (e1y + e2y) / 2, 0.46 * ps, 0.1 * ps, -pitch, 0, Math.PI * 2);
-      ctx.fillStyle = "#141f38"; ctx.fill(); ctx.strokeStyle = "rgba(175, 238, 255, 0.7)"; ctx.lineWidth = 1.2; ctx.stroke();
-      shape(WING); ctx.fillStyle = "#30436e"; ctx.fill(); ctx.strokeStyle = "rgba(175, 238, 255, 0.8)"; ctx.stroke();
-      ctx.fillStyle = "rgba(190, 240, 255, 0.55)";
+      ctx.fillStyle = "#171c27"; ctx.fill(); ctx.strokeStyle = "rgba(214, 224, 238, 0.55)"; ctx.lineWidth = 1.2; ctx.stroke();
+      shape(WING); ctx.fillStyle = "#353f54"; ctx.fill(); ctx.strokeStyle = "rgba(214, 224, 238, 0.7)"; ctx.stroke();
+      ctx.fillStyle = "rgba(220, 228, 240, 0.45)";
       for (let i = 0; i < 9; i++) { const [wx, wy] = P([1.15 - i * 0.26, 0.15]); ctx.beginPath(); ctx.arc(wx, wy, 0.035 * ps, 0, Math.PI * 2); ctx.fill(); }
       const [c1x, c1y] = P([1.78, 0.16]), [c2x, c2y] = P([1.52, 0.24]);
-      ctx.strokeStyle = "rgba(190, 240, 255, 0.8)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c1x, c1y); ctx.lineTo(c2x, c2y); ctx.stroke();
+      ctx.strokeStyle = "rgba(220, 228, 240, 0.7)"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(c1x, c1y); ctx.lineTo(c2x, c2y); ctx.stroke();
     }
     ctx.restore();
 
@@ -167,15 +167,14 @@ export default function PlaneScene() {
       const k = s * 1.05;
       ctx.save(); ctx.globalAlpha = show;
       const [lx, ly] = P([0.2, 0.35]);
-      arrow(ctx, lx, ly, lx, ly - Math.min(s * 2.4, S.lift * k), "#7dd3c0", "Lift");
+      arrow(ctx, lx, ly, lx, ly - Math.min(s * 2.4, S.lift * k), undefined, "Lift");
       const [wx, wy] = P([0.2, -0.3]);
-      arrow(ctx, wx, wy, wx, wy + W * k, "#f0a3b4", "Weight");
+      arrow(ctx, wx, wy, wx, wy + W * k, undefined, "Weight");
       const [tx, ty] = P([1.0, -0.38]), tl = Math.min(s * 2.6, S.thrust * k * 1.8);
-      if (tl > 6) arrow(ctx, tx, ty, tx + cp * tl, ty - sp * tl, "#fbbf77", "Thrust");
+      if (tl > 6) arrow(ctx, tx, ty, tx + cp * tl, ty - sp * tl, undefined, "Thrust");
       const [dx, dy] = P([-2.2, 0.18]), dl = Math.min(s * 2.6, S.drag * k * 1.8);
       if (dl > 6) {
-        arrow(ctx, dx, dy, dx - dl, dy, "#b4a6ff");
-        ctx.font = font(600, 13); ctx.fillStyle = "#b4a6ff"; ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText("Drag", dx - dl - 10, dy);
+        arrow(ctx, dx, dy, dx - dl, dy, undefined, "Drag");
       }
       ctx.restore();
     }

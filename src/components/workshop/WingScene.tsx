@@ -126,7 +126,7 @@ export default function WingScene() {
     // Where the wing started: a faint ghost, so you can see how far it has climbed.
     if (S.height > 0.06) {
       ctx.save();
-      ctx.setLineDash([5, 6]); ctx.strokeStyle = "rgba(160, 240, 255, 0.28)"; ctx.lineWidth = 1.2;
+      ctx.setLineDash([5, 6]); ctx.strokeStyle = "rgba(200, 212, 230, 0.25)"; ctx.lineWidth = 1.2;
       ctx.beginPath();
       WING.forEach(([x, y], i) => { const X = x * ca + y * sa, Y = -x * sa + y * ca; if (i) ctx.lineTo(sx(X), sy(Y)); else ctx.moveTo(sx(X), sy(Y)); });
       ctx.closePath(); ctx.stroke();
@@ -144,24 +144,24 @@ export default function WingScene() {
     if (drawn >= 1) {
       ctx.closePath();
       const g = ctx.createLinearGradient(0, wingC.y - s * 0.4, 0, wingC.y + s * 0.4);
-      g.addColorStop(0, "#22304f"); g.addColorStop(1, "#0d1424");
+      g.addColorStop(0, "#2a3346"); g.addColorStop(1, "#11161f");
       ctx.globalAlpha = Math.min(1, (time - 0.9) * 2);
       ctx.fillStyle = g; ctx.fill();
       ctx.globalAlpha = 1;
     }
-    ctx.shadowColor = "rgba(110, 231, 255, 0.5)"; ctx.shadowBlur = 5;
-    ctx.strokeStyle = "rgba(175, 238, 255, 0.95)"; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.strokeStyle = "rgba(214, 224, 238, 0.9)"; ctx.lineWidth = 1.25; ctx.stroke();
     ctx.restore();
 
     // Forces: lift up, weight down. Lift bigger than weight → the wing rises.
     if (time > 1.4) {
       const lift = Math.min(s * 2.2, S.lift * s * 0.42), weight = WEIGHT * s * 0.42;
-      if (lift > 4) arrow(ctx, wingC.x, wingC.y - s * 0.25, wingC.x, wingC.y - s * 0.25 - lift, "#7dd3c0", "Lift");
-      arrow(ctx, wingC.x + s * 0.5, wingC.y + s * 0.2, wingC.x + s * 0.5, wingC.y + s * 0.2 + weight, "#f0a3b4", "Weight");
+      if (lift > 4) arrow(ctx, wingC.x, wingC.y - s * 0.25, wingC.x, wingC.y - s * 0.25 - lift, undefined, "Lift");
+      arrow(ctx, wingC.x + s * 0.5, wingC.y + s * 0.2, wingC.x + s * 0.5, wingC.y + s * 0.2 + weight, undefined, "Weight");
       if (showP && U > 0.25 && stall < 0.5) {
-        ctx.font = font(500, 14); ctx.textAlign = "center";
-        ctx.fillStyle = "rgba(170, 185, 255, 0.85)"; ctx.fillText("lower pressure", wingC.x - s * 1.2, wingC.y - s * 1.15);
-        ctx.fillStyle = "rgba(255, 195, 120, 0.85)"; ctx.fillText("higher pressure", wingC.x - s * 1.0, wingC.y + s * 1.05);
+        ctx.font = font(600, 11); ctx.textAlign = "center";
+        try { (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "1.5px"; } catch { /* older browsers */ }
+        ctx.fillStyle = "rgba(200, 210, 235, 0.75)"; ctx.fillText("LOWER PRESSURE", wingC.x - s * 1.2, wingC.y - s * 1.15);
+        ctx.fillStyle = "rgba(240, 200, 150, 0.75)"; ctx.fillText("HIGHER PRESSURE", wingC.x - s * 1.0, wingC.y + s * 1.05);
       }
     }
   });

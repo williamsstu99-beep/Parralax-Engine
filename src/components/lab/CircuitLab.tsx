@@ -9,7 +9,7 @@ import {
 import { SAMPLES, type Sample } from "@/engine/lens/circuit/samples";
 import { initialTransientState, solveDC, step } from "@/engine/truth/circuit/solver";
 import type { Solution, TransientState } from "@/engine/truth/circuit/types";
-import { Mark, Wordmark } from "@/components/brand/Mark";
+import { Wordmark } from "@/components/brand/Mark";
 import ChallengeBanner from "./ChallengeBanner";
 import { G, LED_COLORS, PartSymbol, TrayIcon } from "./symbols";
 import { fmtAmps, fmtFarads, fmtOhms, fmtVolts, fmtWatts } from "./format";
@@ -266,7 +266,7 @@ export default function CircuitLab({ initial, embedded = false, workshop = false
         </div>
       ) : (
       <header className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-[var(--line)] px-4 py-3 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5 text-[19px]"><Mark size={28} /><Wordmark /></Link>
+        <Link href="/" className="flex items-center gap-2.5 text-[19px]"><Wordmark /></Link>
         <span className="hidden text-[var(--muted)] sm:inline">/</span>
         <span className="font-medium">Circuits lab</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Mark, Wordmark } from "@/components/brand/Mark";
-import { MAIN_SCENES, SCENES, type SceneId } from "@/lib/scenes";
+import { Wordmark } from "@/components/brand/Mark";
+import { ENGINE_SCENES, SCENES, type SceneId } from "@/lib/scenes";
 import ReimagineBar from "./ReimagineBar";
 
 /**
@@ -23,9 +23,10 @@ export default function SceneShell({ id, caption, controls, children, hint, fit 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_520px_at_50%_-10%,rgba(110,231,255,0.10),transparent_65%),radial-gradient(700px_500px_at_90%_110%,rgba(167,139,250,0.08),transparent_60%)]" />
 
       <header className="relative z-20 flex items-center gap-4 px-4 py-3.5 sm:px-8">
-        <Link href="/" className="flex items-center gap-2.5 text-[18px]"><Mark size={26} /><Wordmark /></Link>
+        <Link href="/" className="text-[17px]"><Wordmark /></Link>
+        <Link href={`/engine/${scene.engine}`} className="hidden font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--dim)] hover:text-[var(--fg)] sm:block">{scene.engine === "maths" ? "Maths" : "Physics"} engine</Link>
         <nav aria-label="Simulations" className="ml-auto hidden items-center gap-1 text-sm md:flex">
-          {MAIN_SCENES.map(k => SCENES[k]).map(s => (
+          {ENGINE_SCENES[scene.engine].map(k => SCENES[k]).map(s => (
             <Link key={s.id} href={`/workshop/${s.id}`} aria-current={s.id === id ? "page" : undefined}
               className={`rounded-full px-3 py-1.5 transition-colors ${s.id === scene.family ? "bg-white/10 text-[var(--fg)]" : "text-[var(--muted)] hover:text-[var(--fg)]"}`}>{s.short}</Link>
           ))}
@@ -38,7 +39,7 @@ export default function SceneShell({ id, caption, controls, children, hint, fit 
       </div>
 
       <main className="relative z-10 flex flex-1 flex-col gap-4 px-2 pt-3 pb-4 sm:px-6">
-        <div className={`relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-[radial-gradient(120%_100%_at_50%_0%,#0d1527_0%,#05070d_75%)] shadow-[0_40px_120px_-60px_rgba(110,231,255,0.35)] ${fit ? "p-3 sm:p-5" : "flex-1 aspect-[4/3.6] sm:aspect-auto sm:min-h-[min(62vh,640px)]"}`}>
+        <div className={`relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-[radial-gradient(120%_100%_at_50%_0%,#0d1527_0%,#05070d_75%)] shadow-[0_40px_120px_-70px_rgba(0,0,0,0.9)] ${fit ? "p-3 sm:p-5" : "flex-1 aspect-[4/3.6] sm:aspect-auto sm:min-h-[min(62vh,640px)]"}`}>
           <div className={`transition-[opacity,filter,transform] duration-[900ms] ease-out ${fit ? "" : "absolute inset-0"} ${leaving ? "scale-[0.97] opacity-0 blur-md" : ""}`}>{children}</div>
           {leaving && (
             <div aria-live="polite" className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
@@ -55,7 +56,7 @@ export default function SceneShell({ id, caption, controls, children, hint, fit 
           <p aria-live="polite" className="min-h-[3.2em] flex-1 px-2 text-[17px] leading-snug text-[var(--fg)]/90 text-pretty sm:text-lg">{caption}</p>
           <div className="glass flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[24px] px-5 py-3.5">{controls}</div>
         </div>
-        <ReimagineBar id={id} onLeave={setLeaving} />
+        {scene.reimagine.length > 0 && <ReimagineBar id={id} onLeave={setLeaving} />}
       </main>
     </div>
   );

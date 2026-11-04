@@ -30,7 +30,7 @@ export default function ReimagineBar({ id, onLeave }: { id: SceneId; onLeave: (l
     }
     await new Promise(r => setTimeout(r, Math.max(0, 1100 - (Date.now() - started)))); // let the dissolve play
     if (to === id) { setBusy(false); onLeave(""); setNote("That's what you're looking at. Try asking for it a different way."); return; }
-    router.push(to === "other" ? `/?build=${encodeURIComponent(request)}` : `/workshop/${to}`);
+    router.push(to === "other" ? `/engine/${SCENES[id].engine}?build=${encodeURIComponent(request)}` : `/workshop/${to}`);
   }
 
   return (

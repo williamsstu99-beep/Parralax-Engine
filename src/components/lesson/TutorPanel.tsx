@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Mark } from "@/components/brand/Mark";
+
 import type { Board } from "@/engine/lens/circuit/board";
 import type { MotionSetup } from "@/engine/truth/motion/types";
 import type { PopulationSetup } from "@/engine/truth/population/solver";
@@ -113,7 +113,7 @@ export default function TutorPanel({ lesson, sceneIdx, getSim }: { lesson: Lesso
     return (
       <button onClick={() => setOpen(true)}
         className="fixed right-4 bottom-4 z-40 flex items-center gap-2.5 rounded-full border border-[var(--line)] bg-[var(--panel)] py-3 pr-5 pl-4 font-medium shadow-[0_8px_30px_rgba(0,0,0,0.45)] hover:border-[var(--flow)]">
-        <Mark size={24} /> Ask the tutor
+        <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-[var(--volt)]" /> Ask the tutor
       </button>
     );
   }
@@ -122,7 +122,7 @@ export default function TutorPanel({ lesson, sceneIdx, getSim }: { lesson: Lesso
     <aside aria-label="AI tutor"
       className="fixed right-4 bottom-4 z-40 flex h-[min(620px,calc(100dvh-32px))] w-[min(400px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-[0_12px_48px_rgba(0,0,0,0.55)]">
       <header className="flex items-center gap-2.5 border-b border-[var(--line)] px-4 py-3">
-        <Mark size={24} />
+        <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-[var(--volt)]" />
         <div className="flex flex-col leading-tight">
           <span className="font-semibold">Tutor</span>
           <span className="text-xs text-[var(--muted)]">Sees your simulation · numbers come from the solver</span>
