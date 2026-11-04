@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Mark, Wordmark } from "@/components/brand/Mark";
+import { Wordmark } from "@/components/brand/Mark";
 import Field from "@/components/brand/Field";
 import Hero from "@/components/lesson/Hero";
 import BuildStage from "@/components/lesson/BuildStage";
 import LessonView from "@/components/lesson/LessonView";
 import type { Lesson } from "@/engine/spec/lesson";
 import type { LessonEvent } from "@/lib/lesson-events";
-import { MAIN_SCENES, SCENES } from "@/lib/scenes";
+import { ENGINE_SCENES, SCENES, type EngineId } from "@/lib/scenes";
 
 type Stage = Extract<LessonEvent, { t: "stage" }>;
 type Status =
@@ -19,7 +19,7 @@ type Status =
   | { kind: "ready"; lesson: Lesson; example: boolean };
 
 
-export default function LessonStudio() {
+export default function LessonStudio({ engine = "physics" }: { engine?: EngineId }) {
   const [request, setRequest] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const router = useRouter();
@@ -33,7 +33,7 @@ export default function LessonStudio() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("build");
     if (!q) return;
-    window.history.replaceState(null, "", "/");
+    window.history.replaceState(null, "", window.location.pathname);
     setRequest(q); setQueued(q); // eslint-disable-line react-hooks/set-state-in-effect -- one-off read of the URL on arrival
   }, []);
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function LessonStudio() {
     setStatus({ kind: "loading", started: Date.now(), request: text.trim(), fixes: [] });
     try {
       // First: is this one of the hand-crafted simulations? If so, go straight there.
-      const pick = await fetch("/api/scene", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text }) })
+      const pick = await fetch("/api/scene", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: text, engine }) })
         .then(r => (r.status === 401 ? { scene: "locked" } : r.ok ? r.json() : { scene: "other" })).catch(() => ({ scene: "other" })) as { scene: string };
       if (pick.scene === "locked") { setLocked(true); setStatus({ kind: "idle", needsCode: true }); return; }
       if (pick.scene !== "other") {
@@ -116,16 +116,17 @@ export default function LessonStudio() {
 
       <header className="sticky top-0 z-30 flex items-center gap-4 px-4 py-3.5 sm:px-8">
         <div aria-hidden="true" className={`absolute inset-0 -z-10 transition-opacity ${ready ? "border-b border-[var(--line)] bg-[rgba(5,7,13,0.7)] backdrop-blur-xl" : "opacity-0"}`} />
-        <button onClick={() => setStatus({ kind: "idle" })} className="flex items-center gap-2.5 text-[18px]" aria-label="Dynamic Learning, start a new lesson"><Mark size={26} /><Wordmark /></button>
+        <button onClick={() => setStatus({ kind: "idle" })} className="text-[17px]" aria-label="Dynamic Learning, start a new lesson"><Wordmark /></button>
+        <Link href="/" className="hidden font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--dim)] hover:text-[var(--fg)] sm:block">All engines</Link>
         <nav className="ml-auto flex items-center gap-1 text-sm">
-          {MAIN_SCENES.map(id => SCENES[id]).map(sc => <Link key={sc.id} href={`/workshop/${sc.id}`} className="hidden rounded-full px-3 py-2 text-[var(--muted)] hover:text-[var(--fg)] md:block">{sc.short}</Link>)}
+          {ENGINE_SCENES[engine].map(id => SCENES[id]).map(sc => <Link key={sc.id} href={`/workshop/${sc.id}`} className="hidden rounded-full px-3 py-2 text-[var(--muted)] hover:text-[var(--fg)] md:block">{sc.short}</Link>)}
           {ready && <button onClick={() => { setRequest(""); setStatus({ kind: "idle" }); }} className="btn-ghost ml-2 rounded-full px-4 py-2">New lesson</button>}
         </nav>
       </header>
 
       {status.kind === "ready" ? <LessonView lesson={status.lesson} example={status.example} />
         : status.kind === "loading" ? <BuildStage request={status.request} started={status.started} stage={status.stage} fixes={status.fixes} />
-        : <Hero value={request} onChange={setRequest} onSubmit={() => generate(request)} busy={false} error={status.error} needsCode={!!status.needsCode} onUnlock={unlock} />}
+        : <Hero engine={engine} value={request} onChange={setRequest} onSubmit={() => generate(request)} busy={false} error={status.error} needsCode={!!status.needsCode} onUnlock={unlock} />}
     </div>
   );
 }

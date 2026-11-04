@@ -2,62 +2,70 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { MAIN_SCENES, SCENES } from "@/lib/scenes";
+import { ENGINE_SCENES, SCENES, type EngineId } from "@/lib/scenes";
 
-/** Ideas the placeholder types out: proof that anything goes, without a wall of buttons. */
-const IDEAS = [
-  "Build me a wing and show how it lifts as the plane speeds up",
-  "Let's build a circuit with a battery and two bulbs",
-  "Show me how magnets attract and repel",
-  "How does a generator make electricity from a magnet?",
-  "What's going on inside a battery?",
-  "Why does a wing stall if it tilts too far?",
-  "Why do bulbs get dimmer when you add more?",
-  "Show me the magnetic field around a bar magnet",
-];
+/** Ideas the placeholder types out, per engine: proof that anything goes, without a wall of buttons. */
+const IDEAS: Record<EngineId, string[]> = {
+  physics: [
+    "Build me a wing and show how it lifts as the plane speeds up",
+    "Show me the forces on a plane during take off",
+    "Let's build a circuit with a battery and two bulbs",
+    "Why does water speed up when a pipe gets narrower?",
+    "How does a generator make electricity from a magnet?",
+    "What's going on inside a battery?",
+    "Show me the magnetic field around a bar magnet",
+  ],
+  maths: [
+    "Show me how three quarters becomes a decimal",
+    "Break a whole into fifths and turn it into a decimal",
+    "What does 3/8 look like on a number line?",
+    "Why is one third 0.333 forever?",
+  ],
+};
 
 /** Types each idea out, holds it, then deletes it. Pauses while the student is typing. */
-function useTypewriter(paused: boolean) {
+function useTypewriter(paused: boolean, ideas: string[]) {
   const [text, setText] = useState("");
   const [idea, setIdea] = useState(0);
   const state = useRef({ i: 0, ch: 0, dir: 1 as 1 | -1, hold: 0 });
   useEffect(() => {
     if (paused) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const id = setInterval(() => { state.current.i = (state.current.i + 1) % IDEAS.length; setIdea(state.current.i); setText(IDEAS[state.current.i]); }, 3500);
-      setText(IDEAS[state.current.i]);
+      const id = setInterval(() => { state.current.i = (state.current.i + 1) % ideas.length; setIdea(state.current.i); setText(ideas[state.current.i]); }, 3500);
+      setText(ideas[state.current.i]);
       return () => clearInterval(id);
     }
     const id = setInterval(() => {
-      const s = state.current, full = IDEAS[s.i];
+      const s = state.current, full = ideas[s.i];
       if (s.hold > 0) { s.hold--; return; }
       s.ch += s.dir;
       if (s.ch >= full.length) { s.ch = full.length; s.dir = -1; s.hold = 55; }
-      if (s.ch <= 0) { s.ch = 0; s.dir = 1; s.i = (s.i + 1) % IDEAS.length; s.hold = 6; setIdea(s.i); }
+      if (s.ch <= 0) { s.ch = 0; s.dir = 1; s.i = (s.i + 1) % ideas.length; s.hold = 6; setIdea(s.i); }
       setText(full.slice(0, s.ch));
     }, 34);
     return () => clearInterval(id);
-  }, [paused]);
-  return { text, full: IDEAS[idea] };
+  }, [paused, ideas]);
+  return { text, full: ideas[idea] };
 }
 
-export default function Hero({ value, onChange, onSubmit, busy, error, needsCode = false, onUnlock }: {
+export default function Hero({ engine, value, onChange, onSubmit, busy, error, needsCode = false, onUnlock }: {
+  engine: EngineId;
   value: string; onChange: (v: string) => void; onSubmit: () => void; busy: boolean;
   error?: { message: string; details?: string[] };
   /** The request needs the access code first: show a small code field under the prompt. */
   needsCode?: boolean; onUnlock?: (code: string) => Promise<string | null>;
 }) {
-  const ghost = useTypewriter(value.length > 0 || busy);
+  const ghost = useTypewriter(value.length > 0 || busy, IDEAS[engine]);
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { input.current?.focus(); }, []);
 
   return (
     <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center px-4 pt-[14vh] pb-16 text-center">
       <span className="anim-rise hairline mb-7 rounded-full px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]" style={{ animationDelay: "0.05s" }}>
-        <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-[var(--flow)] align-middle shadow-[0_0_10px_var(--flow)]" />Powered by the Parallax Engine
+        <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-[var(--volt)] align-middle" />{engine === "maths" ? "Mathematics" : "Physics"} engine
       </span>
       <h1 className="anim-rise text-[clamp(2.6rem,7vw,5.2rem)] leading-[0.98] font-semibold tracking-[-0.045em] text-balance" style={{ animationDelay: "0.12s" }}>
-        Teach anything.<br /><span className="text-gradient">Watch it come alive.</span>
+        {engine === "maths" ? <>Ask for any idea.<br /><span className="text-gradient">See it take shape.</span></> : <>Teach anything.<br /><span className="text-gradient">Watch it come alive.</span></>}
       </h1>
       <p className="anim-rise mt-6 max-w-xl text-lg leading-relaxed text-[var(--muted)] text-pretty" style={{ animationDelay: "0.22s" }}>
         Say what you want to teach. Watch it build itself in front of your class, then reach in and play with it.
@@ -102,7 +110,7 @@ export default function Hero({ value, onChange, onSubmit, busy, error, needsCode
       <div className="anim-fade mt-14 flex flex-col items-center gap-3" style={{ animationDelay: "0.6s" }}>
         <span className="text-sm text-[var(--dim)]">Or jump straight in</span>
         <nav aria-label="Simulations" className="flex flex-wrap justify-center gap-2">
-          {MAIN_SCENES.map(id => SCENES[id]).map((sc, i) => (
+          {ENGINE_SCENES[engine].map(id => SCENES[id]).map((sc, i) => (
             <Link key={sc.id} href={`/workshop/${sc.id}`} className="anim-rise glass rounded-full px-4 py-2 text-sm text-[var(--fg)]/90 transition-all hover:border-[var(--flow)]/50 hover:text-[var(--fg)] hover:shadow-[0_0_24px_-6px_rgba(110,231,255,0.6)]" style={{ animationDelay: `${0.7 + i * 0.06}s` }}>{sc.short}</Link>
           ))}
         </nav>

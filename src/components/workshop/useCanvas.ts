@@ -69,28 +69,31 @@ export function font(weight: number, px: number) {
 }
 
 /**
- * A crisp force arrow: thin solid shaft, slim head, a dark under-stroke so it
- * reads on busy backgrounds without any glow. Draws from (x1,y1) to (x2,y2).
+ * A force arrow in an engineering-drawing style: a fine solid shaft, a slim
+ * head, a small tracked-out label, and no glow. The colour defaults to near
+ * white; the label sits past the tip on whichever side the arrow points.
  */
-export function arrow(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color: string, label?: string) {
+export function arrow(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, color = "rgba(236, 241, 248, 0.95)", label?: string) {
   const len = Math.hypot(x2 - x1, y2 - y1);
   if (len < 6) return;
-  const ux = (x2 - x1) / len, uy = (y2 - y1) / len, head = Math.min(12, len * 0.45), wide = head * 0.42;
+  const ux = (x2 - x1) / len, uy = (y2 - y1) / len, head = Math.min(10, len * 0.4), wide = head * 0.36;
   const bx = x2 - ux * head, by = y2 - uy * head;
-  const shape = () => {
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(bx + ux * 1.5, by + uy * 1.5);
-  };
-  const tip = () => {
-    ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(bx - uy * wide, by + ux * wide); ctx.lineTo(bx + uy * wide, by - ux * wide); ctx.closePath();
-  };
   ctx.save();
-  ctx.shadowBlur = 0; ctx.lineCap = "round"; ctx.lineJoin = "round";
-  ctx.strokeStyle = "rgba(5, 7, 13, 0.55)"; ctx.lineWidth = 5; shape(); ctx.stroke(); tip(); ctx.stroke();
-  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2; shape(); ctx.stroke(); tip(); ctx.fill();
-  ctx.beginPath(); ctx.arc(x1, y1, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+  // A thin dark keyline underneath keeps it legible over bright particles.
+  ctx.strokeStyle = "rgba(4, 6, 12, 0.5)"; ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(bx, by); ctx.stroke();
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(bx + ux, by + uy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(bx - uy * wide, by + ux * wide); ctx.lineTo(bx + uy * wide, by - ux * wide); ctx.closePath(); ctx.fill();
+  // A short perpendicular tick marks where the force acts.
+  ctx.lineWidth = 1.25; ctx.beginPath(); ctx.moveTo(x1 - uy * 4, y1 + ux * 4); ctx.lineTo(x1 + uy * 4, y1 - ux * 4); ctx.stroke();
   if (label) {
-    ctx.font = font(600, 13); ctx.textBaseline = "middle"; ctx.textAlign = "left";
-    ctx.fillText(label, x2 + 10, y2 + uy * 2);
+    ctx.font = font(600, 11); ctx.textBaseline = "middle";
+    try { (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "1.5px"; } catch { /* older browsers */ }
+    const text = label.toUpperCase();
+    if (Math.abs(uy) > Math.abs(ux)) { ctx.textAlign = "left"; ctx.fillText(text, x2 + 8, y2 + uy * 4); }
+    else { ctx.textAlign = ux > 0 ? "left" : "right"; ctx.fillText(text, x2 + ux * 8, y2 - 10); }
   }
   ctx.restore();
 }

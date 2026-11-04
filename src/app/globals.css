@@ -57,7 +57,7 @@ body {
 .hairline { border: 1px solid var(--line); }
 
 .text-gradient {
-  background: linear-gradient(100deg, #fff 0%, #cfe9ff 35%, var(--flow) 60%, var(--violet) 100%);
+  background: linear-gradient(100deg, #fff 0%, #eef1f6 40%, #f3c48f 80%, #f2a65a 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

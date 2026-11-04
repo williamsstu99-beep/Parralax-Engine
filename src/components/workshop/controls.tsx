@@ -47,3 +47,18 @@ export function Segmented<T extends string>({ label, value, options, onChange }:
 export function Button({ children, onClick, primary }: { children: React.ReactNode; onClick: () => void; primary?: boolean }) {
   return <button onClick={onClick} className={`${primary ? "btn-primary" : "btn-ghost"} rounded-full px-4 py-2 text-sm`}>{children}</button>;
 }
+
+/** A number with − and + buttons, for small whole-number choices. */
+export function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
+  const btn = "flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-[var(--fg)] ring-1 ring-white/10 transition-colors hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent";
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium">{label}</span>
+      <div className="flex items-center gap-2" role="group" aria-label={label}>
+        <button className={btn} onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} aria-label={`Fewer: ${label}`}>−</button>
+        <output aria-live="polite" className="w-8 text-center font-mono text-lg tabular-nums">{value}</output>
+        <button className={btn} onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label={`More: ${label}`}>+</button>
+      </div>
+    </div>
+  );
+}
