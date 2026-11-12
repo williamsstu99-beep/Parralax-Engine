@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The bundled simulation runtime (built by npm run kit).
+    "public/kit/**",
   ]),
 ]);
 
